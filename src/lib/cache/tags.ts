@@ -9,9 +9,11 @@ export const CRM_TAGS = {
   notifications: "crm:notifications",
   activity: "crm:activity",
   users: "crm:users",
+  approvals: "crm:approvals",
   portal: "crm:portal",
   documents: "crm:documents",
   feedback: "crm:feedback",
+  groups: "crm:groups",
 } as const;
 
 export type CrmTag = (typeof CRM_TAGS)[keyof typeof CRM_TAGS];

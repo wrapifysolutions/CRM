@@ -6,6 +6,7 @@ import {
   CalendarDays,
   FileText,
   MessageSquarePlus,
+  MessagesSquare,
 } from "lucide-react";
 import { logoutAction } from "@/actions/auth";
 import { getPortalClient } from "@/actions/portal";
@@ -70,6 +71,11 @@ export default async function PortalLayout({
               <Button asChild variant="ghost" size="sm">
                 <Link href="/portal/feedback">
                   <MessageSquarePlus className="h-4 w-4" /> Feedback
+                </Link>
+              </Button>
+              <Button asChild variant="ghost" size="sm">
+                <Link href="/portal/groups">
+                  <MessagesSquare className="h-4 w-4" /> Groups
                 </Link>
               </Button>
             </nav>

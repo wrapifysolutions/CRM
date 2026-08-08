@@ -86,6 +86,9 @@ const taskSchema = new Schema(
     description: { type: String, default: null },
     project_id: { type: String, required: true, index: true },
     assigned_to: { type: String, default: null, index: true },
+    /** Multi-assignee support (WhatsApp-style groups). */
+    assignee_ids: { type: [String], default: [] },
+    group_id: { type: String, default: null, index: true },
     due_date: { type: String, default: null },
     priority: {
       type: String,
@@ -226,6 +229,41 @@ const feedbackSchema = new Schema(
   { timestamps }
 );
 
+const workGroupSchema = new Schema(
+  {
+    id: { type: String, required: true, unique: true, index: true },
+    name: { type: String, required: true },
+    project_id: { type: String, required: true, index: true },
+    created_by: { type: String, required: true, index: true },
+    member_user_ids: { type: [String], default: [] },
+    member_client_ids: { type: [String], default: [] },
+    deleted_at: { type: Date, default: null },
+  },
+  { timestamps }
+);
+
+const groupMessageSchema = new Schema(
+  {
+    id: { type: String, required: true, unique: true, index: true },
+    group_id: { type: String, required: true, index: true },
+    sender_user_id: { type: String, required: true, index: true },
+    /** Text can be empty when only an attachment is sent. */
+    body: { type: String, default: "" },
+    attachments: {
+      type: [
+        {
+          file_path: { type: String, required: true },
+          file_name: { type: String, required: true },
+          mime_type: { type: String, default: null },
+          size: { type: Number, default: 0 },
+        },
+      ],
+      default: [],
+    },
+  },
+  { timestamps: { createdAt: "created_at", updatedAt: false } }
+);
+
 export const CompanyModel =
   models.Company || model("Company", companySchema, "companies");
 export const ClientModel =
@@ -247,6 +285,11 @@ export const NotificationModel =
   model("Notification", notificationSchema, "notifications");
 export const FeedbackModel =
   models.Feedback || model("Feedback", feedbackSchema, "feedback");
+export const WorkGroupModel =
+  models.WorkGroup || model("WorkGroup", workGroupSchema, "work_groups");
+export const GroupMessageModel =
+  models.GroupMessage ||
+  model("GroupMessage", groupMessageSchema, "group_messages");
 
 export function newId() {
   return crypto.randomUUID();

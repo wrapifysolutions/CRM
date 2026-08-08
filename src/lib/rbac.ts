@@ -173,7 +173,11 @@ export function homePathForRole(role: UserRole) {
 
 export function canAccessRoute(role: UserRole, path: string) {
   if (role === "client") {
-    return path.startsWith("/portal") || path.startsWith("/api/files");
+    return (
+      path.startsWith("/portal") ||
+      path.startsWith("/api/files") ||
+      path.startsWith("/api/groups")
+    );
   }
   if (path.startsWith("/portal")) return false;
   if (path.startsWith("/users") || path.startsWith("/settings/roles")) {
@@ -194,6 +198,9 @@ export function canAccessRoute(role: UserRole, path: string) {
   if (path.startsWith("/meetings") || path.startsWith("/feedback")) {
     // Client meetings + feedback inbox — managers/admins, not employees
     return hasPermission(role, "clients.view");
+  }
+  if (path.startsWith("/groups")) {
+    return hasPermission(role, "projects.view");
   }
   return true;
 }

@@ -134,5 +134,14 @@ export function bustFeedback() {
   });
 }
 
+export function bustGroups() {
+  bustCache({
+    tags: [CRM_TAGS.groups, CRM_TAGS.tasks, CRM_TAGS.portal],
+    paths: ["/groups", "/portal/groups", "/tasks"],
+  });
+  revalidatePath("/groups", "layout");
+  revalidatePath("/portal/groups", "layout");
+}
+
 export { CRM_TAGS, CACHE_TTL } from "@/lib/cache/tags";
 export type { CrmTag } from "@/lib/cache/tags";

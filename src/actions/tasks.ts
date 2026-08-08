@@ -54,6 +54,12 @@ async function attachTask(
     description: (task.description as string | null) ?? null,
     project_id: String(task.project_id),
     assigned_to: (task.assigned_to as string | null) ?? null,
+    assignee_ids: Array.isArray(task.assignee_ids)
+      ? (task.assignee_ids as string[]).map(String)
+      : task.assigned_to
+        ? [String(task.assigned_to)]
+        : [],
+    group_id: (task.group_id as string | null) ?? null,
     due_date: (task.due_date as string | null) ?? null,
     priority: task.priority as PriorityLevel,
     status: task.status as TaskStatus,
@@ -122,6 +128,12 @@ async function attachTasksListBatch(rows: Record<string, unknown>[]) {
       description: (task.description as string | null) ?? null,
       project_id: String(task.project_id),
       assigned_to: (task.assigned_to as string | null) ?? null,
+      assignee_ids: Array.isArray(task.assignee_ids)
+        ? (task.assignee_ids as string[]).map(String)
+        : task.assigned_to
+          ? [String(task.assigned_to)]
+          : [],
+      group_id: (task.group_id as string | null) ?? null,
       due_date: (task.due_date as string | null) ?? null,
       priority: task.priority as PriorityLevel,
       status: task.status as TaskStatus,
@@ -184,7 +196,10 @@ export async function getTasks(params?: {
       if (params?.project_id) filter.project_id = params.project_id;
       if (params?.assigned_to) filter.assigned_to = params.assigned_to;
       if (scopedMine) {
-        filter.assigned_to = profile.id;
+        filter.$or = [
+          { assigned_to: profile.id },
+          { assignee_ids: profile.id },
+        ];
       }
 
       const count = await TaskModel.countDocuments(filter);
@@ -240,17 +255,28 @@ export async function createTaskAction(
 
   await connectMongo();
   const id = newId();
+  const assigneeIds = [
+    ...new Set(
+      [
+        parsed.data.assigned_to,
+        ...(formData.getAll("assignee_ids") as string[]),
+      ].filter(Boolean) as string[]
+    ),
+  ];
+  const primary = parsed.data.assigned_to || assigneeIds[0] || null;
+
   await TaskModel.create({
     id,
     ...parsed.data,
-    assigned_to: parsed.data.assigned_to || null,
+    assigned_to: primary,
+    assignee_ids: assigneeIds,
     due_date: parsed.data.due_date || null,
     created_by: profile.id,
   });
 
-  if (parsed.data.assigned_to) {
+  for (const uid of assigneeIds) {
     await createNotification({
-      user_id: parsed.data.assigned_to,
+      user_id: uid,
       title: "New task assigned",
       message: `You were assigned: ${parsed.data.title}`,
       link: `/tasks/${id}`,
@@ -292,18 +318,52 @@ export async function updateTaskAction(
     return { success: false, error: parsed.error.issues[0]?.message };
   }
 
+  const assigneeIds = [
+    ...new Set(
+      [
+        parsed.data.assigned_to,
+        ...(formData.getAll("assignee_ids") as string[]),
+      ].filter(Boolean) as string[]
+    ),
+  ];
+  const primary = parsed.data.assigned_to || assigneeIds[0] || null;
+
   await connectMongo();
+  const previous = await TaskModel.findOne({ id, deleted_at: null })
+    .select("assignee_ids assigned_to")
+    .lean();
+  if (!previous) return { success: false, error: "Task not found" };
+
   const updated = await TaskModel.findOneAndUpdate(
     { id, deleted_at: null },
     {
       ...parsed.data,
-      assigned_to: parsed.data.assigned_to || null,
+      assigned_to: primary,
+      assignee_ids: assigneeIds,
       due_date: parsed.data.due_date || null,
     },
     { new: true }
   ).lean();
 
   if (!updated) return { success: false, error: "Task not found" };
+
+  const prevIds = new Set(
+    [
+      ...(Array.isArray(previous.assignee_ids)
+        ? (previous.assignee_ids as string[])
+        : []),
+      previous.assigned_to ? String(previous.assigned_to) : "",
+    ].filter(Boolean)
+  );
+  for (const uid of assigneeIds) {
+    if (prevIds.has(uid)) continue;
+    await createNotification({
+      user_id: uid,
+      title: "Task assigned to you",
+      message: `You were assigned: ${parsed.data.title}`,
+      link: `/tasks/${id}`,
+    });
+  }
 
   await logActivity({
     action: "updated",

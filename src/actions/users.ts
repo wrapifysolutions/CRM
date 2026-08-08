@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireProfile } from "@/lib/auth";
+import { requireStaffProfile } from "@/lib/auth/require-staff";
 import { logActivity } from "@/lib/activity";
 import { hasPermission } from "@/lib/rbac";
 import { connectMongo } from "@/lib/mongodb";
@@ -125,6 +126,56 @@ export async function getManagersAndEmployees() {
     email: r.email as string,
     role: r.role as UserRole,
   }));
+}
+
+/** Who can be added to a work group, by creator role. */
+export async function getEmployeesForGroups() {
+  const profile = await requireStaffProfile();
+  if (!hasPermission(profile.role, "projects.view")) return [];
+
+  await connectMongo();
+
+  // Super admin / admin → managers only
+  // Manager → their employees only
+  if (profile.role === "super_admin" || profile.role === "admin") {
+    const rows = await UserModel.find({
+      deleted_at: null,
+      is_active: true,
+      approval_status: "approved",
+      role: "manager",
+    })
+      .sort({ full_name: 1 })
+      .select("id full_name email role")
+      .lean();
+
+    return rows.map((r) => ({
+      id: String(r.id),
+      full_name: String(r.full_name),
+      email: String(r.email),
+      role: r.role as UserRole,
+    }));
+  }
+
+  if (profile.role === "manager") {
+    const rows = await UserModel.find({
+      deleted_at: null,
+      is_active: true,
+      approval_status: "approved",
+      role: "employee",
+    })
+      .sort({ full_name: 1 })
+      .select("id full_name email role")
+      .lean();
+
+    return rows.map((r) => ({
+      id: String(r.id),
+      full_name: String(r.full_name),
+      email: String(r.email),
+      role: r.role as UserRole,
+    }));
+  }
+
+  return [];
 }
 
 export async function updateUserFromFormAction(

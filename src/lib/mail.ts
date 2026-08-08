@@ -356,6 +356,50 @@ function formatMeetingWhen(value: string) {
   }).format(date);
 }
 
+/** Notify an employee they were added to a project work group by a manager. */
+export async function sendGroupAssignmentEmail(params: {
+  to: string;
+  employeeName: string;
+  managerName: string;
+  projectName: string;
+  groupName: string;
+  groupId: string;
+}) {
+  const link = `${appBaseUrl()}/groups/${params.groupId}`;
+  const subject = `${APP_NAME}: You were assigned to project "${params.projectName}"`;
+
+  const text = [
+    `Dear ${params.employeeName},`,
+    "",
+    `${params.managerName} has assigned you to the project "${params.projectName}" in the work group "${params.groupName}".`,
+    "",
+    `Open the group chat: ${link}`,
+    "",
+    "Kind regards,",
+    `The ${COMPANY_NAME} Team`,
+  ].join("\n");
+
+  const html = wrapHtml(
+    subject,
+    `
+    <p style="margin:0 0 16px;font-size:15px;line-height:1.6;">Dear ${escapeHtml(params.employeeName)},</p>
+    <p style="margin:0 0 16px;font-size:15px;line-height:1.6;">
+      <strong>${escapeHtml(params.managerName)}</strong> has assigned you to the project
+      <strong>"${escapeHtml(params.projectName)}"</strong> via the work group
+      <strong>"${escapeHtml(params.groupName)}"</strong>.
+    </p>
+    <p style="margin:0 0 24px;">
+      <a href="${link}" style="display:inline-block;background:#24548c;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600;">
+        Open group chat
+      </a>
+    </p>
+    <p style="margin:0;font-size:13px;color:#64748b;">If the button does not work, open: ${link}</p>
+  `
+  );
+
+  return sendMail({ to: params.to, subject, html, text });
+}
+
 /** Notify manager or client when a meeting is scheduled. */
 export async function sendMeetingScheduledEmail(params: {
   to: string;

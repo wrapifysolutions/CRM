@@ -18,6 +18,7 @@ const STAFF_PREFIXES = [
   "/notifications",
   "/activity",
   "/feedback",
+  "/groups",
   "/settings",
   "/api/clients",
 ];

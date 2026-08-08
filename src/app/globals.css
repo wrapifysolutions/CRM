@@ -135,6 +135,17 @@ body {
   }
 }
 
+@keyframes bubble-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 @keyframes rise-in {
   from {
     opacity: 0;
@@ -144,6 +155,231 @@ body {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+@keyframes live-dot {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.35);
+    opacity: 0.55;
+  }
+}
+
+@keyframes chat-orb-a {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  33% {
+    transform: translate(12%, 8%) scale(1.08);
+  }
+  66% {
+    transform: translate(-8%, 14%) scale(0.94);
+  }
+}
+
+@keyframes chat-orb-b {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  40% {
+    transform: translate(-14%, -10%) scale(1.12);
+  }
+  70% {
+    transform: translate(10%, -6%) scale(0.9);
+  }
+}
+
+@keyframes chat-orb-c {
+  0%,
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.45;
+  }
+  50% {
+    transform: translate(-40%, -60%) scale(1.2);
+    opacity: 0.7;
+  }
+}
+
+@keyframes chat-grid-drift {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 48px 48px;
+  }
+}
+
+@keyframes chat-sheen {
+  0% {
+    transform: translateX(-120%) rotate(12deg);
+  }
+  100% {
+    transform: translateX(220%) rotate(12deg);
+  }
+}
+
+@keyframes chat-particle {
+  0% {
+    transform: translateY(0) scale(1);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.55;
+  }
+  85% {
+    opacity: 0.35;
+  }
+  100% {
+    transform: translateY(-120px) scale(0.6);
+    opacity: 0;
+  }
+}
+
+.animate-bubble-in {
+  animation: bubble-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.animate-live-dot {
+  animation: live-dot 1.6s ease-in-out infinite;
+}
+
+.group-chat-surface {
+  position: relative;
+  isolation: isolate;
+  background-color: color-mix(in srgb, var(--surface) 50%, var(--card));
+  overflow: hidden;
+}
+
+.group-chat-surface__aurora {
+  pointer-events: none;
+  position: absolute;
+  inset: -20%;
+  z-index: 0;
+  background:
+    radial-gradient(
+      circle at 20% 20%,
+      color-mix(in srgb, var(--brand) 22%, transparent),
+      transparent 42%
+    ),
+    radial-gradient(
+      circle at 80% 10%,
+      color-mix(in srgb, var(--accent) 18%, transparent),
+      transparent 40%
+    ),
+    radial-gradient(
+      circle at 70% 80%,
+      color-mix(in srgb, var(--brand-soft) 55%, transparent),
+      transparent 45%
+    );
+  filter: blur(8px);
+  animation: chat-orb-a 18s ease-in-out infinite;
+}
+
+.group-chat-surface__orb {
+  pointer-events: none;
+  position: absolute;
+  z-index: 0;
+  border-radius: 9999px;
+  filter: blur(40px);
+  opacity: 0.55;
+}
+
+.group-chat-surface__orb--a {
+  width: 220px;
+  height: 220px;
+  top: -40px;
+  left: -30px;
+  background: color-mix(in srgb, var(--brand) 35%, transparent);
+  animation: chat-orb-a 14s ease-in-out infinite;
+}
+
+.group-chat-surface__orb--b {
+  width: 260px;
+  height: 260px;
+  right: -50px;
+  bottom: 10%;
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
+  animation: chat-orb-b 16s ease-in-out infinite;
+}
+
+.group-chat-surface__orb--c {
+  width: 180px;
+  height: 180px;
+  left: 40%;
+  top: 45%;
+  background: color-mix(in srgb, var(--brand) 20%, transparent);
+  animation: chat-orb-c 12s ease-in-out infinite;
+}
+
+.group-chat-surface__grid {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  opacity: 0.22;
+  background-image:
+    linear-gradient(
+      to right,
+      color-mix(in srgb, var(--border) 55%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--border) 55%, transparent) 1px,
+      transparent 1px
+    );
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse 80% 70% at 50% 40%, #000 20%, transparent 75%);
+  animation: chat-grid-drift 28s linear infinite;
+}
+
+.group-chat-surface__sheen {
+  pointer-events: none;
+  position: absolute;
+  inset: -30% -10%;
+  z-index: 0;
+  width: 40%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, white 18%, transparent),
+    transparent
+  );
+  animation: chat-sheen 9s ease-in-out infinite;
+  opacity: 0.35;
+}
+
+.group-chat-surface__particle {
+  pointer-events: none;
+  position: absolute;
+  z-index: 0;
+  width: 5px;
+  height: 5px;
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--brand) 70%, white);
+  animation: chat-particle 7s ease-in-out infinite;
+  opacity: 0;
+}
+
+.dark .group-chat-surface__sheen {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, white 8%, transparent),
+    transparent
+  );
+}
+
+.group-chat-surface__content {
+  position: relative;
+  z-index: 1;
 }
 
 @keyframes fade-up {

@@ -55,12 +55,18 @@ export async function connectMongo() {
         maxPoolSize: Number(process.env.MONGO_MAX_POOL ?? 50),
         minPoolSize: Number(process.env.MONGO_MIN_POOL ?? 2),
         maxIdleTimeMS: 30_000,
-        serverSelectionTimeoutMS: 5_000,
+        serverSelectionTimeoutMS: 8_000,
         socketTimeoutMS: 30_000,
       })
       .then((m) => m)
       .catch((err) => {
         cached.promise = null;
+        const msg = err instanceof Error ? err.message : String(err);
+        if (/bad auth|authentication failed/i.test(msg)) {
+          throw new Error(
+            "MongoDB authentication failed. Update MONGODB_URI username/password in .env.local (Atlas → Database Access → Edit user → set new password), then restart npm run dev."
+          );
+        }
         throw err;
       });
   }
