@@ -48,6 +48,24 @@ export async function loginAction(
     if (result.approval_status !== "approved") {
       redirect("/pending");
     }
+
+    const rawRedirect = String(formData.get("redirect") || "").trim();
+    const safeRedirect =
+      rawRedirect.startsWith("/") &&
+      !rawRedirect.startsWith("//") &&
+      !rawRedirect.includes("://")
+        ? rawRedirect
+        : null;
+
+    if (safeRedirect) {
+      if (result.role === "client" && safeRedirect.startsWith("/portal")) {
+        redirect(safeRedirect);
+      }
+      if (result.role !== "client" && !safeRedirect.startsWith("/portal")) {
+        redirect(safeRedirect);
+      }
+    }
+
     redirect(result.role === "client" ? "/portal" : "/dashboard");
   } catch (error) {
     if (isRedirectError(error)) throw error;

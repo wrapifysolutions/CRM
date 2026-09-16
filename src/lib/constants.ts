@@ -11,6 +11,8 @@ export const APP_NAME = "WrapCRM";
 export const APP_TAGLINE = "Operate every client relationship with precision.";
 export const COMPANY_NAME = "Wrapify Solutions";
 export const COMPANY_URL = "https://www.wrapifysolutions.com";
+/** Live deployment — used for email CTAs when env is missing/localhost */
+export const APP_PUBLIC_URL = "https://crm-ivory-tau.vercel.app";
 export const APP_BYLINE = `A product of ${COMPANY_NAME}`;
 
 /** Seeded Super Admin accounts (created/refreshed on auth bootstrap). */

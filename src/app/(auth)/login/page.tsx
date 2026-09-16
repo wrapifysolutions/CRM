@@ -29,6 +29,12 @@ async function LoginInner({
         ? "Your account is inactive."
         : null;
   const resetOk = params.reset === "1";
+  const redirectTo =
+    params.redirect &&
+    params.redirect.startsWith("/") &&
+    !params.redirect.startsWith("//")
+      ? params.redirect
+      : "";
 
   return (
     <AuthShell>
@@ -59,6 +65,9 @@ async function LoginInner({
           </p>
         }
       >
+        {redirectTo ? (
+          <input type="hidden" name="redirect" value={redirectTo} />
+        ) : null}
         <div className="space-y-2">
           <Label htmlFor="email">Work email</Label>
           <Input

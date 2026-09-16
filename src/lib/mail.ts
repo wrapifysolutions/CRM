@@ -1,13 +1,27 @@
 import nodemailer from "nodemailer";
-import { APP_NAME, COMPANY_NAME, COMPANY_URL } from "@/lib/constants";
+import { APP_NAME, APP_PUBLIC_URL, COMPANY_NAME, COMPANY_URL } from "@/lib/constants";
 import type { UserRole } from "@/types/database";
 import { homePathForRole } from "@/lib/rbac";
 
 function appBaseUrl() {
-  return (
-    process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ||
-    "http://localhost:3000"
+  const candidates = [
+    process.env.NEXT_PUBLIC_APP_URL,
+    process.env.APP_URL,
+    process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "",
+    APP_PUBLIC_URL,
+  ]
+    .map((v) => (v || "").trim().replace(/\/$/, ""))
+    .filter(Boolean);
+
+  // Prefer a public URL for emails (localhost links fail in Gmail / phones).
+  const publicUrl = candidates.find(
+    (u) => !/localhost|127\.0\.0\.1/i.test(u)
   );
+  if (publicUrl) {
+    return publicUrl.startsWith("http") ? publicUrl : `https://${publicUrl}`;
+  }
+
+  return candidates[0] || APP_PUBLIC_URL;
 }
 
 function fromEmail() {
@@ -125,8 +139,11 @@ export async function sendAccountApprovedEmail(params: {
   const label = roleLabel(params.role);
   const isClient = params.role === "client";
   const path = homePathForRole(params.role);
-  const accessUrl = `${appBaseUrl()}${path}`;
-  const loginUrl = `${appBaseUrl()}/login`;
+  const base = appBaseUrl();
+  // Always go through login with redirect so the CTA works when logged out,
+  // and middleware sends already-signed-in users to the dashboard/portal.
+  const accessUrl = `${base}${path}`;
+  const loginUrl = `${base}/login?redirect=${encodeURIComponent(path)}`;
 
   const subject = isClient
     ? `${APP_NAME}: Your client portal access has been approved`
@@ -142,8 +159,7 @@ export async function sendAccountApprovedEmail(params: {
         "",
         "You may now sign in and review your project progress, tasks, meetings, and shared documents.",
         "",
-        `Sign in: ${loginUrl}`,
-        `Portal: ${accessUrl}`,
+        `Access portal: ${loginUrl}`,
         "",
         "If you need assistance, please contact your account manager.",
         "",
@@ -157,8 +173,7 @@ export async function sendAccountApprovedEmail(params: {
         "",
         "You can now access the workspace dashboard and begin using the features available for your role.",
         "",
-        `Sign in: ${loginUrl}`,
-        `Dashboard: ${accessUrl}`,
+        `Access dashboard: ${loginUrl}`,
         "",
         "If you did not request this account, please contact your administrator immediately.",
         "",
@@ -166,14 +181,14 @@ export async function sendAccountApprovedEmail(params: {
         `The ${COMPANY_NAME} Team`,
       ].join("\n");
 
-  const ctaLabel = isClient ? "Open Client Portal" : "Open Dashboard";
+  const ctaLabel = isClient ? "Access Client Portal" : "Access Dashboard";
   const intro = isClient
     ? `We are pleased to inform you that your <strong>${APP_NAME} Client Portal</strong> access has been approved by our team.`
     : `We are pleased to inform you that your <strong>${APP_NAME} ${label}</strong> account has been approved.`;
 
   const detail = isClient
-    ? "You may now sign in to review project progress, tasks, meetings with your manager, and shared documents."
-    : "You can now access the workspace dashboard and begin using the features available for your role.";
+    ? "Click the button below to sign in and open your portal. If you are already signed in, you will go straight to the portal."
+    : "Click the button below to sign in and open your dashboard. If you are already signed in, you will go straight to the dashboard.";
 
   const html = wrapHtml(
     subject,
@@ -187,8 +202,11 @@ export async function sendAccountApprovedEmail(params: {
         </a>
       </p>
       <p style="margin:0;font-size:13px;color:#64748b;line-height:1.5;">
-        Or open this link:<br />
-        <a href="${accessUrl}" style="color:#24548c;">${accessUrl}</a>
+        Or copy this link into your browser:<br />
+        <a href="${loginUrl}" style="color:#24548c;word-break:break-all;">${loginUrl}</a>
+      </p>
+      <p style="margin:16px 0 0;font-size:12px;color:#94a3b8;line-height:1.5;">
+        Direct home: <a href="${accessUrl}" style="color:#24548c;">${accessUrl}</a>
       </p>
       <p style="margin:24px 0 0;line-height:1.55;color:#334155;">
         Kind regards,<br />

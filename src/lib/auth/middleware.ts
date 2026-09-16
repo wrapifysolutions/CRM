@@ -89,7 +89,30 @@ export async function updateSession(request: NextRequest) {
       path.startsWith("/verify-email"))
   ) {
     const url = request.nextUrl.clone();
-    url.pathname = user.role === "client" ? "/portal" : "/dashboard";
+    const requested = request.nextUrl.searchParams.get("redirect");
+    const safeRedirect =
+      requested &&
+      requested.startsWith("/") &&
+      !requested.startsWith("//") &&
+      !requested.includes("://")
+        ? requested
+        : null;
+
+    if (user.role === "client") {
+      url.pathname =
+        safeRedirect && safeRedirect.startsWith("/portal")
+          ? safeRedirect
+          : "/portal";
+    } else if (
+      safeRedirect &&
+      !safeRedirect.startsWith("/portal") &&
+      !safeRedirect.startsWith("/login")
+    ) {
+      url.pathname = safeRedirect;
+    } else {
+      url.pathname = "/dashboard";
+    }
+    url.search = "";
     return NextResponse.redirect(url);
   }
 
