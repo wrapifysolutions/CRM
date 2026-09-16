@@ -4,24 +4,31 @@ import type { UserRole } from "@/types/database";
 import { homePathForRole } from "@/lib/rbac";
 
 function appBaseUrl() {
-  const candidates = [
-    process.env.NEXT_PUBLIC_APP_URL,
-    process.env.APP_URL,
-    process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "",
-    APP_PUBLIC_URL,
-  ]
-    .map((v) => (v || "").trim().replace(/\/$/, ""))
-    .filter(Boolean);
+  // Emails must use the stable production domain only.
+  // Do NOT use VERCEL_URL — preview hosts (e.g. *-wrapify-team.vercel.app)
+  // hit Vercel SSO protection instead of the app login.
+  const envUrl = (
+    process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.APP_URL ||
+    ""
+  )
+    .trim()
+    .replace(/\/$/, "");
 
-  // Prefer a public URL for emails (localhost links fail in Gmail / phones).
-  const publicUrl = candidates.find(
-    (u) => !/localhost|127\.0\.0\.1/i.test(u)
-  );
-  if (publicUrl) {
-    return publicUrl.startsWith("http") ? publicUrl : `https://${publicUrl}`;
+  if (envUrl && !/localhost|127\.0\.0\.1/i.test(envUrl)) {
+    const normalized = envUrl.startsWith("http") ? envUrl : `https://${envUrl}`;
+    try {
+      const host = new URL(normalized).hostname.toLowerCase();
+      const isPreview =
+        host.endsWith(".vercel.app") &&
+        host !== "crm-ivory-tau.vercel.app";
+      if (!isPreview) return normalized;
+    } catch {
+      // fall through to APP_PUBLIC_URL
+    }
   }
 
-  return candidates[0] || APP_PUBLIC_URL;
+  return APP_PUBLIC_URL;
 }
 
 function fromEmail() {
