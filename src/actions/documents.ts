@@ -114,21 +114,32 @@ export async function getDocuments(params?: {
     .lean();
   const uploaderMap = new Map(uploaders.map((u) => [String(u.id), u]));
 
-  return rows.map((d) => ({
-    id: String(d.id),
-    name: String(d.name ?? d.file_name ?? "file"),
-    file_name: String(d.file_name ?? d.name ?? "file"),
-    file_path: String(d.file_path ?? ""),
-    file_size: d.file_size ? Number(d.file_size) : null,
-    mime_type: d.mime_type ? String(d.mime_type) : null,
-    entity_type: String(d.entity_type),
-    entity_id: String(d.entity_id),
-    uploaded_by: d.uploaded_by ? String(d.uploaded_by) : null,
-    uploader_name: d.uploaded_by
-      ? uploaderMap.get(String(d.uploaded_by))?.full_name ?? null
-      : null,
-    created_at: toIso(d.created_at as Date) ?? new Date().toISOString(),
-  }));
+  return rows.map((d) => {
+    const filePath = String(d.file_path ?? "");
+    const chatId = filePath.startsWith("chat://")
+      ? filePath.slice("chat://".length)
+      : null;
+    return {
+      id: String(d.id),
+      name: String(d.name ?? d.file_name ?? "file"),
+      file_name: String(d.file_name ?? d.name ?? "file"),
+      file_path: filePath,
+      file_url: chatId
+        ? `/api/groups/files/${chatId}`
+        : filePath
+          ? `/api/files/${filePath}`
+          : null,
+      file_size: d.file_size ? Number(d.file_size) : null,
+      mime_type: d.mime_type ? String(d.mime_type) : null,
+      entity_type: String(d.entity_type),
+      entity_id: String(d.entity_id),
+      uploaded_by: d.uploaded_by ? String(d.uploaded_by) : null,
+      uploader_name: d.uploaded_by
+        ? uploaderMap.get(String(d.uploaded_by))?.full_name ?? null
+        : null,
+      created_at: toIso(d.created_at as Date) ?? new Date().toISOString(),
+    };
+  });
 }
 
 export async function uploadDocumentAction(

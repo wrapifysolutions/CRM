@@ -80,7 +80,14 @@ export function DocumentUploader({
             className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2 dark:border-slate-800"
           >
             <a
-              href={`/api/files/${doc.file_path}`}
+              href={
+                doc.file_url ||
+                (doc.file_path?.startsWith("chat://")
+                  ? `/api/groups/files/${doc.file_path.slice("chat://".length)}`
+                  : `/api/files/${doc.file_path}`)
+              }
+              target="_blank"
+              rel="noreferrer"
               className="min-w-0 flex-1 hover:underline"
             >
               <p className="truncate text-sm font-medium">{doc.name}</p>

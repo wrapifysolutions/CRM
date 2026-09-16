@@ -35,6 +35,7 @@ export function TaskForm({
   };
 }) {
   const router = useRouter();
+  const isCreate = !task?.id;
 
   return (
     <Card>
@@ -126,6 +127,21 @@ export function TaskForm({
               defaultValue={task?.description ?? ""}
             />
           </div>
+          {isCreate && (
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="files">Attach files for employee</Label>
+              <Input
+                id="files"
+                name="files"
+                type="file"
+                multiple
+                accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv"
+              />
+              <p className="text-xs text-muted">
+                PDF, Word, Excel, images, or text — up to 5 files, 6MB each.
+              </p>
+            </div>
+          )}
         </FormShell>
       </CardContent>
     </Card>

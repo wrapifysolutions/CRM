@@ -721,12 +721,35 @@ export async function createGroupTaskAction(
     created_by: profile.id,
   });
 
+  const files = formData.getAll("files").filter(isUploadedFile);
+  let attachmentNames: string[] = [];
+  if (files.length > 0) {
+    try {
+      const { saveTaskAttachments } = await import("@/lib/tasks/attachments");
+      const saved = await saveTaskAttachments({
+        files,
+        taskId: id,
+        uploadedBy: profile.id,
+        projectId: String(group.project_id),
+      });
+      attachmentNames = saved.map((s) => s.name);
+    } catch (error) {
+      return {
+        success: false,
+        error:
+          error instanceof Error ? error.message : "Failed to upload files",
+      };
+    }
+  }
+
   await Promise.all(
     filtered.map((uid) =>
       createNotification({
         user_id: uid,
         title: "Group task assigned",
-        message: `${title} in group`,
+        message: attachmentNames.length
+          ? `${title} in group (${attachmentNames.length} file${attachmentNames.length > 1 ? "s" : ""} attached)`
+          : `${title} in group`,
         type: "task",
         link: `/tasks/${id}`,
       })
@@ -737,7 +760,12 @@ export async function createGroupTaskAction(
     action: "created",
     entity_type: "task",
     entity_id: id,
-    metadata: { title, group_id: groupId, assignees: filtered },
+    metadata: {
+      title,
+      group_id: groupId,
+      assignees: filtered,
+      attachments: attachmentNames,
+    },
   });
 
   bustTasks();

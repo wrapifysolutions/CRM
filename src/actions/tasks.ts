@@ -18,6 +18,10 @@ import type { ActionResult } from "@/core/types/result";
 import type { PriorityLevel, TaskStatus } from "@/types/database";
 import { PAGE_SIZE } from "@/lib/constants";
 import { CACHE_TTL, CRM_TAGS, cachedQuery, bustTasks } from "@/lib/cache";
+import {
+  isUploadedFile,
+  saveTaskAttachments,
+} from "@/lib/tasks/attachments";
 
 async function attachTask(
   task: Record<string, unknown>,
@@ -274,11 +278,33 @@ export async function createTaskAction(
     created_by: profile.id,
   });
 
+  const files = formData.getAll("files").filter(isUploadedFile);
+  let attachmentNames: string[] = [];
+  if (files.length > 0) {
+    try {
+      const saved = await saveTaskAttachments({
+        files,
+        taskId: id,
+        uploadedBy: profile.id,
+        projectId: parsed.data.project_id,
+      });
+      attachmentNames = saved.map((s) => s.name);
+    } catch (error) {
+      return {
+        success: false,
+        error:
+          error instanceof Error ? error.message : "Failed to upload files",
+      };
+    }
+  }
+
   for (const uid of assigneeIds) {
     await createNotification({
       user_id: uid,
       title: "New task assigned",
-      message: `You were assigned: ${parsed.data.title}`,
+      message: attachmentNames.length
+        ? `You were assigned: ${parsed.data.title} (${attachmentNames.length} file${attachmentNames.length > 1 ? "s" : ""} attached)`
+        : `You were assigned: ${parsed.data.title}`,
       link: `/tasks/${id}`,
     });
   }
@@ -287,7 +313,10 @@ export async function createTaskAction(
     action: "created",
     entity_type: "task",
     entity_id: id,
-    metadata: { title: parsed.data.title },
+    metadata: {
+      title: parsed.data.title,
+      attachments: attachmentNames,
+    },
   });
 
   bustTasks();

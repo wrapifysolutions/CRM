@@ -66,6 +66,19 @@ export function GroupTaskForm({
           Select one or more employees to assign this task.
         </p>
       </div>
+      <div className="space-y-2">
+        <Label htmlFor="files">Attach files</Label>
+        <Input
+          id="files"
+          name="files"
+          type="file"
+          multiple
+          accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv"
+        />
+        <p className="text-xs text-muted">
+          PDF, Word, Excel, images — employee can open these on the task.
+        </p>
+      </div>
     </FormShell>
   );
 }
