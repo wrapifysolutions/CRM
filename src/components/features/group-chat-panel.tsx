@@ -16,10 +16,12 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 
 export type ChatAttachment = {
-  file_path: string;
+  file_id?: string | null;
+  file_path?: string | null;
   file_name: string;
   mime_type: string | null;
   size: number;
+  url?: string | null;
 };
 
 export type ChatMessage = {
@@ -31,9 +33,16 @@ export type ChatMessage = {
   sender: { id: string; full_name: string; role: string } | null;
 };
 
+function attachmentUrl(a: ChatAttachment) {
+  if (a.url) return a.url;
+  if (a.file_id) return `/api/groups/files/${a.file_id}`;
+  if (a.file_path) return `/api/files/${a.file_path}`;
+  return null;
+}
+
 function isImage(mime: string | null, name: string) {
   if (mime?.startsWith("image/")) return true;
-  return /\.(jpe?g|png|gif|webp)$/i.test(name);
+  return /\.(jpe?g|png|gif|webp|heic|heif)$/i.test(name);
 }
 
 function initials(name: string) {
@@ -180,9 +189,19 @@ export function GroupChatPanel({
 
   function onSubmit(formData: FormData) {
     setError(null);
-    files.forEach((f) => formData.append("files", f));
+    const payload = new FormData();
+    payload.set("group_id", groupId);
+    const body = String(formData.get("body") || "").trim();
+    if (body) payload.set("body", body);
+    files.forEach((f) => payload.append("files", f));
+
+    if (!body && files.length === 0) {
+      setError("Write a message or attach a file");
+      return;
+    }
+
     startTransition(async () => {
-      const result: ActionResult = await sendGroupMessageAction(null, formData);
+      const result: ActionResult = await sendGroupMessageAction(null, payload);
       if (!result.success) {
         setError(result.error ?? "Failed to send");
         return;
@@ -342,13 +361,15 @@ export function GroupChatPanel({
                     ) : null}
                     {(m.attachments ?? []).length > 0 && (
                       <div className={cn("space-y-2", m.body && "mt-2")}>
-                        {(m.attachments ?? []).map((a) => {
-                          const href = `/api/files/${a.file_path}`;
+                        {(m.attachments ?? []).map((a, idx) => {
+                          const href = attachmentUrl(a);
+                          if (!href) return null;
                           const img = isImage(a.mime_type, a.file_name);
+                          const key = a.file_id || a.file_path || `${a.file_name}-${idx}`;
                           if (img) {
                             return (
                               <a
-                                key={a.file_path}
+                                key={key}
                                 href={href}
                                 target="_blank"
                                 rel="noreferrer"
@@ -365,7 +386,7 @@ export function GroupChatPanel({
                           }
                           return (
                             <a
-                              key={a.file_path}
+                              key={key}
                               href={href}
                               target="_blank"
                               rel="noreferrer"

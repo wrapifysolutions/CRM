@@ -252,7 +252,8 @@ const groupMessageSchema = new Schema(
     attachments: {
       type: [
         {
-          file_path: { type: String, required: true },
+          file_id: { type: String, default: null },
+          file_path: { type: String, default: null },
           file_name: { type: String, required: true },
           mime_type: { type: String, default: null },
           size: { type: Number, default: 0 },
@@ -260,6 +261,21 @@ const groupMessageSchema = new Schema(
       ],
       default: [],
     },
+  },
+  { timestamps: { createdAt: "created_at", updatedAt: false } }
+);
+
+/** Chat uploads stored in MongoDB (works on Vercel; local disk does not). */
+const chatFileSchema = new Schema(
+  {
+    id: { type: String, required: true, unique: true, index: true },
+    group_id: { type: String, required: true, index: true },
+    message_id: { type: String, default: null, index: true },
+    uploaded_by: { type: String, required: true },
+    file_name: { type: String, required: true },
+    mime_type: { type: String, default: null },
+    size: { type: Number, default: 0 },
+    data: { type: Buffer, required: true },
   },
   { timestamps: { createdAt: "created_at", updatedAt: false } }
 );
@@ -290,6 +306,8 @@ export const WorkGroupModel =
 export const GroupMessageModel =
   models.GroupMessage ||
   model("GroupMessage", groupMessageSchema, "group_messages");
+export const ChatFileModel =
+  models.ChatFile || model("ChatFile", chatFileSchema, "chat_files");
 
 export function newId() {
   return crypto.randomUUID();

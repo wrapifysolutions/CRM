@@ -6,6 +6,7 @@ import { requireStaffProfile } from "@/lib/auth/require-staff";
 import { connectMongo } from "@/lib/mongodb";
 import {
   ClientModel,
+  ChatFileModel,
   DocumentModel,
   GroupMessageModel,
   ProjectModel,
@@ -18,7 +19,6 @@ import { UserModel } from "@/lib/auth/user-model";
 import { createNotification, logActivity } from "@/lib/activity";
 import { hasPermission, isStaffRole } from "@/lib/rbac";
 import { bustGroups, bustTasks } from "@/lib/cache";
-import { saveUpload } from "@/lib/storage";
 import { sendGroupAssignmentEmail } from "@/lib/mail";
 import { publishGroupChat } from "@/lib/groups/chat-bus";
 import type { ActionResult } from "@/core/types/result";
@@ -27,8 +27,20 @@ const notDeleted = {
   $or: [{ deleted_at: null }, { deleted_at: { $exists: false } }],
 };
 
-const MAX_CHAT_FILE_BYTES = 12 * 1024 * 1024;
-const ALLOWED_CHAT_MIME = /^(image\/(jpeg|jpg|png|gif|webp)|application\/pdf|text\/plain|application\/msword|application\/vnd\.openxmlformats-officedocument\.(wordprocessingml\.document|spreadsheetml\.sheet)|application\/vnd\.ms-excel)$/i;
+const MAX_CHAT_FILE_BYTES = 6 * 1024 * 1024;
+const ALLOWED_CHAT_EXT =
+  /\.(jpe?g|png|gif|webp|heic|heif|pdf|doc|docx|xls|xlsx|txt|csv)$/i;
+
+function isUploadedFile(value: FormDataEntryValue): value is File {
+  if (typeof value !== "object" || value === null) return false;
+  const f = value as File;
+  return (
+    typeof f.arrayBuffer === "function" &&
+    typeof f.size === "number" &&
+    f.size > 0 &&
+    typeof f.name === "string"
+  );
+}
 
 function uniqueIds(ids: string[]) {
   return [...new Set(ids.map(String).filter(Boolean))];
@@ -86,12 +98,22 @@ function mapMessage(
   senderMap: Map<string, { id: string; full_name: string; role: string }>
 ) {
   const attachments = Array.isArray(m.attachments)
-    ? (m.attachments as Record<string, unknown>[]).map((a) => ({
-        file_path: String(a.file_path),
-        file_name: String(a.file_name),
-        mime_type: a.mime_type ? String(a.mime_type) : null,
-        size: Number(a.size || 0),
-      }))
+    ? (m.attachments as Record<string, unknown>[]).map((a) => {
+        const fileId = a.file_id ? String(a.file_id) : null;
+        const filePath = a.file_path ? String(a.file_path) : null;
+        return {
+          file_id: fileId,
+          file_path: filePath,
+          file_name: String(a.file_name),
+          mime_type: a.mime_type ? String(a.mime_type) : null,
+          size: Number(a.size || 0),
+          url: fileId
+            ? `/api/groups/files/${fileId}`
+            : filePath
+              ? `/api/files/${filePath}`
+              : null,
+        };
+      })
     : [];
 
   return {
@@ -467,9 +489,7 @@ export async function sendGroupMessageAction(
   const profile = await requireProfile();
   const groupId = String(formData.get("group_id") || "").trim();
   const body = String(formData.get("body") || "").trim();
-  const files = formData
-    .getAll("files")
-    .filter((f): f is File => f instanceof File && f.size > 0);
+  const files = formData.getAll("files").filter(isUploadedFile);
 
   if (!groupId) return { success: false, error: "Missing group" };
   if (body.length < 1 && files.length === 0) {
@@ -479,8 +499,10 @@ export async function sendGroupMessageAction(
   const group = await loadGroupOrThrow(groupId);
   await assertCanAccessGroup(profile, group);
 
+  const messageId = newId();
   const attachments: {
-    file_path: string;
+    file_id: string;
+    file_path: string | null;
     file_name: string;
     mime_type: string | null;
     size: number;
@@ -488,39 +510,59 @@ export async function sendGroupMessageAction(
 
   for (const file of files.slice(0, 5)) {
     if (file.size > MAX_CHAT_FILE_BYTES) {
-      return { success: false, error: `${file.name} is larger than 12MB` };
+      return { success: false, error: `${file.name} is larger than 6MB` };
     }
     const mime = file.type || "application/octet-stream";
-    if (!ALLOWED_CHAT_MIME.test(mime) && !file.name.match(/\.(jpg|jpeg|png|gif|webp|pdf|doc|docx|xls|xlsx|txt)$/i)) {
+    const isImage = mime.startsWith("image/") || ALLOWED_CHAT_EXT.test(file.name);
+    const allowed =
+      isImage ||
+      mime === "application/pdf" ||
+      mime === "text/plain" ||
+      mime === "text/csv" ||
+      ALLOWED_CHAT_EXT.test(file.name);
+    if (!allowed) {
       return {
         success: false,
         error: `${file.name}: only images, PDF, Word, Excel, or text allowed`,
       };
     }
 
-    const saved = await saveUpload(file, `groups/${groupId}`);
-    attachments.push({
-      file_path: saved.relativePath,
+    const bytes = Buffer.from(await file.arrayBuffer());
+    const fileId = newId();
+    await ChatFileModel.create({
+      id: fileId,
+      group_id: groupId,
+      message_id: messageId,
+      uploaded_by: profile.id,
       file_name: file.name,
-      mime_type: saved.mimeType,
-      size: saved.size,
+      mime_type: mime,
+      size: bytes.length,
+      data: bytes,
     });
 
+    attachments.push({
+      file_id: fileId,
+      file_path: null,
+      file_name: file.name,
+      mime_type: mime,
+      size: bytes.length,
+    });
+
+    // Keep a project document index for staff document lists (no disk path).
     await DocumentModel.create({
       id: newId(),
       name: file.name,
-      file_path: saved.relativePath,
-      file_size: saved.size,
-      mime_type: saved.mimeType,
+      file_path: `chat://${fileId}`,
+      file_size: bytes.length,
+      mime_type: mime,
       entity_type: "project",
       entity_id: String(group.project_id),
       uploaded_by: profile.id,
     });
   }
 
-  const id = newId();
   const created = await GroupMessageModel.create({
-    id,
+    id: messageId,
     group_id: groupId,
     sender_user_id: profile.id,
     body,
@@ -532,16 +574,19 @@ export async function sendGroupMessageAction(
     { $set: { updated_at: new Date() } }
   );
 
-  const payload = mapMessage(created.toObject() as Record<string, unknown>, new Map([
-    [
-      profile.id,
-      {
-        id: profile.id,
-        full_name: profile.full_name,
-        role: profile.role,
-      },
-    ],
-  ]));
+  const payload = mapMessage(
+    created.toObject() as Record<string, unknown>,
+    new Map([
+      [
+        profile.id,
+        {
+          id: profile.id,
+          full_name: profile.full_name,
+          role: profile.role,
+        },
+      ],
+    ])
+  );
 
   publishGroupChat(groupId, payload);
 

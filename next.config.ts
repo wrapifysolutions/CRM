@@ -7,6 +7,10 @@ const nextConfig: NextConfig = {
       dynamic: 0,
       static: 180,
     },
+    /** Allow chat image/file uploads through server actions. */
+    serverActions: {
+      bodySizeLimit: "8mb",
+    },
   },
 };
 
