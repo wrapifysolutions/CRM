@@ -63,9 +63,12 @@ export default async function GroupDetailPage({
       : Promise.resolve([]),
   ]);
 
-  const memberOptions = group.members_users.filter((u) =>
-    profile.role === "manager" ? u.role === "employee" : true
-  );
+  const memberOptions =
+    profile.role === "manager"
+      ? users.filter((u) => u.role === "employee")
+      : group.members_users.length > 0
+        ? group.members_users
+        : users.filter((u) => group.member_user_ids.includes(u.id));
 
   // Picker list: only role-allowed people (employees for manager, managers for SA)
   const allUsersForPicker = users;

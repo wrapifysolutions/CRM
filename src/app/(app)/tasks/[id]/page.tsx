@@ -6,7 +6,7 @@ import {
   updateTaskAction,
 } from "@/actions/tasks";
 import { getProjectOptions } from "@/actions/options";
-import { getManagersAndEmployees } from "@/actions/users";
+import { getTaskAssignees } from "@/actions/users";
 import { requireProfile } from "@/lib/auth";
 import { formatDate } from "@/lib/utils";
 import { TaskForm } from "@/components/features/task-form";
@@ -33,7 +33,7 @@ export default async function TaskDetailPage({
 
   const [projects, users] = await Promise.all([
     getProjectOptions(),
-    getManagersAndEmployees(),
+    getTaskAssignees(),
   ]);
 
   const comments = (task.comments ?? []).sort(

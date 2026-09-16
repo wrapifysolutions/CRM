@@ -128,6 +128,42 @@ export async function getManagersAndEmployees() {
   }));
 }
 
+/**
+ * People a staff user may assign tasks to.
+ * Managers → all approved employees; Admin/SA → managers + employees.
+ */
+export async function getTaskAssignees() {
+  const profile = await requireProfile();
+  if (!hasPermission(profile.role, "tasks.assign") &&
+      !hasPermission(profile.role, "tasks.create")) {
+    return [];
+  }
+
+  await connectMongo();
+
+  if (profile.role === "manager") {
+    const rows = await UserModel.find({
+      deleted_at: null,
+      is_active: true,
+      approval_status: "approved",
+      role: "employee",
+    })
+      .sort({ full_name: 1 })
+      .select("id full_name email role")
+      .lean();
+
+    return rows.map((r) => ({
+      id: String(r.id),
+      full_name: String(r.full_name),
+      email: String(r.email),
+      role: r.role as UserRole,
+    }));
+  }
+
+  // Admin / super_admin (and others with assign): managers + employees
+  return getManagersAndEmployees();
+}
+
 /** Who can be added to a work group, by creator role. */
 export async function getEmployeesForGroups() {
   const profile = await requireStaffProfile();

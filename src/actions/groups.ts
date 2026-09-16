@@ -673,11 +673,37 @@ export async function createGroupTaskAction(
   const group = await loadGroupOrThrow(groupId);
   await assertCanAccessGroup(profile, group);
 
-  const allowed = new Set(group.member_user_ids ?? []);
-  allowed.add(String(group.created_by));
-  const filtered = assigneeIds.filter((id) => allowed.has(id));
-  if (filtered.length === 0) {
-    return { success: false, error: "Assignees must be group members" };
+  let filtered: string[];
+  if (profile.role === "manager") {
+    // Managers may assign any approved employee (and add them to the group).
+    const employees = await UserModel.find({
+      id: { $in: assigneeIds },
+      role: "employee",
+      deleted_at: null,
+      is_active: true,
+      approval_status: "approved",
+    })
+      .select("id")
+      .lean();
+    filtered = employees.map((e) => String(e.id));
+    if (filtered.length === 0) {
+      return { success: false, error: "Select at least one employee" };
+    }
+    const existing = new Set(group.member_user_ids ?? []);
+    const toAdd = filtered.filter((id) => !existing.has(id));
+    if (toAdd.length > 0) {
+      await WorkGroupModel.updateOne(
+        { id: groupId },
+        { $addToSet: { member_user_ids: { $each: toAdd } } }
+      );
+    }
+  } else {
+    const allowed = new Set(group.member_user_ids ?? []);
+    allowed.add(String(group.created_by));
+    filtered = assigneeIds.filter((id) => allowed.has(id));
+    if (filtered.length === 0) {
+      return { success: false, error: "Assignees must be group members" };
+    }
   }
 
   const id = newId();

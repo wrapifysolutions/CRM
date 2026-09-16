@@ -62,7 +62,9 @@ export function GroupTaskForm({
             </label>
           ))}
         </div>
-        <p className="text-xs text-muted">Select one or more group members.</p>
+        <p className="text-xs text-muted">
+          Select one or more employees to assign this task.
+        </p>
       </div>
     </FormShell>
   );
