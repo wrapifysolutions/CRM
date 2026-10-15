@@ -3,16 +3,21 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const badgeVariants = cva(
-  "inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-semibold transition-colors",
+  "inline-flex items-center rounded-lg border px-2 py-0.5 text-[11px] font-semibold tracking-wide transition-colors",
   {
     variants: {
       variant: {
-        default: "border-transparent bg-[var(--brand-soft)] text-[var(--foreground)]",
-        secondary: "border-transparent bg-[var(--border)]/40 text-[var(--foreground)]",
-        success: "border-transparent bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200",
-        warning: "border-transparent bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200",
-        danger: "border-transparent bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200",
-        outline: "text-[var(--foreground)] border-[var(--border)]",
+        default:
+          "border-transparent bg-[var(--brand-soft)] text-[var(--brand)]",
+        secondary:
+          "border-transparent bg-[var(--surface)] text-[var(--muted)]",
+        success:
+          "border-transparent bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300",
+        warning:
+          "border-transparent bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300",
+        danger:
+          "border-transparent bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300",
+        outline: "border-[var(--border)] text-[var(--foreground)] bg-transparent",
       },
     },
     defaultVariants: { variant: "default" },
@@ -24,5 +29,7 @@ export interface BadgeProps
     VariantProps<typeof badgeVariants> {}
 
 export function Badge({ className, variant, ...props }: BadgeProps) {
-  return <div className={cn(badgeVariants({ variant }), className)} {...props} />;
+  return (
+    <div className={cn(badgeVariants({ variant }), className)} {...props} />
+  );
 }

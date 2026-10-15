@@ -24,19 +24,30 @@ export function Pagination({
   };
 
   return (
-    <div className="flex items-center justify-between pt-4">
-      <p className="text-sm text-slate-500">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-center text-sm text-muted sm:text-left">
         Page {page} of {totalPages}
       </p>
-      <div className="flex gap-2">
-        <Button variant="outline" size="sm" disabled={page <= 1} asChild={page > 1}>
-          {page > 1 ? <Link href={makeHref(page - 1)}>Previous</Link> : <span>Previous</span>}
+      <div className="grid grid-cols-2 gap-2 sm:flex">
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={page <= 1}
+          asChild={page > 1}
+          className="w-full sm:w-auto"
+        >
+          {page > 1 ? (
+            <Link href={makeHref(page - 1)}>Previous</Link>
+          ) : (
+            <span>Previous</span>
+          )}
         </Button>
         <Button
           variant="outline"
           size="sm"
           disabled={page >= totalPages}
           asChild={page < totalPages}
+          className="w-full sm:w-auto"
         >
           {page < totalPages ? (
             <Link href={makeHref(page + 1)}>Next</Link>

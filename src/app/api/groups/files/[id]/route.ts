@@ -80,17 +80,36 @@ export async function GET(
     }
   }
 
-  const bytes = Buffer.isBuffer(file.data)
-    ? file.data
-    : Buffer.from(file.data as ArrayBuffer);
+  const bytes = toNodeBuffer(file.data);
+  if (!bytes || bytes.length === 0) {
+    return NextResponse.json({ error: "Empty file" }, { status: 404 });
+  }
 
-  return new NextResponse(bytes, {
+  const mime = String(file.mime_type || "application/octet-stream");
+  const safeName = String(file.file_name || "file").replace(/"/g, "");
+
+  return new NextResponse(new Uint8Array(bytes), {
     headers: {
-      "Content-Type": String(file.mime_type || "application/octet-stream"),
+      "Content-Type": mime,
       "Content-Length": String(bytes.length),
-      "Content-Disposition": `inline; filename="${encodeURIComponent(String(file.file_name || "file"))}"`,
+      "Content-Disposition": `inline; filename="${safeName}"`,
       "Cache-Control": "private, max-age=3600",
       "X-Content-Type-Options": "nosniff",
     },
   });
+}
+
+/** Mongoose .lean() returns BSON Binary, not a Node Buffer. */
+function toNodeBuffer(data: unknown): Buffer | null {
+  if (!data) return null;
+  if (Buffer.isBuffer(data)) return data;
+  if (data instanceof Uint8Array) return Buffer.from(data);
+  if (typeof data === "object" && data !== null && "buffer" in data) {
+    const inner = (data as { buffer: unknown }).buffer;
+    if (Buffer.isBuffer(inner)) return inner;
+    if (inner instanceof ArrayBuffer) return Buffer.from(inner);
+    if (inner instanceof Uint8Array) return Buffer.from(inner);
+  }
+  if (data instanceof ArrayBuffer) return Buffer.from(data);
+  return null;
 }

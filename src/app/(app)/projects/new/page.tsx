@@ -3,7 +3,7 @@ import { createProjectAction } from "@/actions/projects";
 import { getClientOptions } from "@/actions/options";
 import { getManagersAndEmployees } from "@/actions/users";
 import { requireProfile } from "@/lib/auth";
-import { hasPermission } from "@/lib/rbac";
+import { canViewFinance, hasPermission } from "@/lib/rbac";
 import { ProjectForm } from "@/components/features/project-form";
 
 export const metadata = { title: "New Project" };
@@ -40,6 +40,7 @@ export default async function NewProjectPage() {
         managers={managers}
         employees={employees}
         defaultManagerId={profile.id}
+        showBudget={canViewFinance(profile.role)}
       />
     </div>
   );

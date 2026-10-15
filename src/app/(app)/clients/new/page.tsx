@@ -3,7 +3,7 @@ import { createClientAction } from "@/actions/clients";
 import { getAllCompanies } from "@/actions/companies";
 import { getManagersAndEmployees } from "@/actions/users";
 import { requireProfile } from "@/lib/auth";
-import { hasPermission } from "@/lib/rbac";
+import { canViewFinance, hasPermission } from "@/lib/rbac";
 import { ClientForm } from "@/components/features/client-form";
 
 export const metadata = { title: "New Client" };
@@ -33,6 +33,7 @@ export default async function NewClientPage() {
         action={createClientAction}
         companies={companies}
         managers={managers}
+        showBudget={canViewFinance(profile.role)}
       />
     </div>
   );

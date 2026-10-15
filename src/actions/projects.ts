@@ -3,7 +3,6 @@
 import { revalidatePath } from "next/cache";
 import { requireProfile } from "@/lib/auth";
 import { logActivity, createNotification } from "@/lib/activity";
-import { hasPermission } from "@/lib/rbac";
 import { connectMongo } from "@/lib/mongodb";
 import { ClientModel, ProjectModel, newId, toIso } from "@/lib/db/models";
 import { UserModel } from "@/lib/auth/user-model";
@@ -19,6 +18,8 @@ import {
   bustPortal,
 } from "@/lib/cache";
 import {
+  canViewFinance,
+  hasPermission,
   redactBudget,
   redactBudgetList,
   redactClientInfo,
@@ -257,13 +258,17 @@ export async function createProjectAction(
   await connectMongo();
   const id = newId();
   const { member_ids, ...projectData } = parsed.data;
+  const allowFinance = canViewFinance(profile.role);
 
-  let budget = Number(projectData.budget ?? 0);
-  if (budget <= 0 && projectData.client_id) {
-    const client = await ClientModel.findOne({ id: projectData.client_id })
-      .select("budget")
-      .lean();
-    budget = Number(client?.budget ?? 0);
+  let budget = 0;
+  if (allowFinance) {
+    budget = Number(projectData.budget ?? 0);
+    if (budget <= 0 && projectData.client_id) {
+      const client = await ClientModel.findOne({ id: projectData.client_id })
+        .select("budget")
+        .lean();
+      budget = Number(client?.budget ?? 0);
+    }
   }
 
   await ProjectModel.create({
@@ -334,31 +339,34 @@ export async function updateProjectAction(
 
   await connectMongo();
   const { member_ids, ...projectData } = parsed.data;
+  const allowFinance = canViewFinance(profile.role);
 
-  let budget = Number(projectData.budget ?? 0);
-  if (budget <= 0 && projectData.client_id) {
-    const client = await ClientModel.findOne({ id: projectData.client_id })
-      .select("budget")
-      .lean();
-    budget = Number(client?.budget ?? 0);
+  const $set: Record<string, unknown> = {
+    name: projectData.name,
+    client_id: projectData.client_id,
+    description: projectData.description || null,
+    deadline: projectData.deadline || null,
+    priority: projectData.priority,
+    status: projectData.status,
+    progress: Number(projectData.progress ?? 0),
+    manager_id: projectData.manager_id || null,
+    member_ids: member_ids ?? [],
+  };
+
+  if (allowFinance) {
+    let budget = Number(projectData.budget ?? 0);
+    if (budget <= 0 && projectData.client_id) {
+      const client = await ClientModel.findOne({ id: projectData.client_id })
+        .select("budget")
+        .lean();
+      budget = Number(client?.budget ?? 0);
+    }
+    $set.budget = budget;
   }
 
   const updated = await ProjectModel.findOneAndUpdate(
     { id },
-    {
-      $set: {
-        name: projectData.name,
-        client_id: projectData.client_id,
-        description: projectData.description || null,
-        budget,
-        deadline: projectData.deadline || null,
-        priority: projectData.priority,
-        status: projectData.status,
-        progress: Number(projectData.progress ?? 0),
-        manager_id: projectData.manager_id || null,
-        member_ids: member_ids ?? [],
-      },
-    },
+    { $set },
     { returnDocument: "after" }
   ).lean();
 

@@ -130,12 +130,15 @@ export async function getManagersAndEmployees() {
 
 /**
  * People a staff user may assign tasks to.
- * Managers → all approved employees; Admin/SA → managers + employees.
+ * Managers → employees; Admin → managers + employees; Super Admin → none.
  */
 export async function getTaskAssignees() {
   const profile = await requireProfile();
-  if (!hasPermission(profile.role, "tasks.assign") &&
-      !hasPermission(profile.role, "tasks.create")) {
+  if (profile.role === "super_admin") return [];
+  if (
+    !hasPermission(profile.role, "tasks.assign") &&
+    !hasPermission(profile.role, "tasks.create")
+  ) {
     return [];
   }
 
@@ -160,11 +163,11 @@ export async function getTaskAssignees() {
     }));
   }
 
-  // Admin / super_admin (and others with assign): managers + employees
+  // Admin (and others with assign): managers + employees
   return getManagersAndEmployees();
 }
 
-/** Who can be added to a work group, by creator role. */
+/** Who can be added to a work group, by actor role. */
 export async function getEmployeesForGroups() {
   const profile = await requireStaffProfile();
   if (!hasPermission(profile.role, "projects.view")) return [];
@@ -172,7 +175,6 @@ export async function getEmployeesForGroups() {
   await connectMongo();
 
   // Super admin / admin → managers only
-  // Manager → their employees only
   if (profile.role === "super_admin" || profile.role === "admin") {
     const rows = await UserModel.find({
       deleted_at: null,
@@ -192,12 +194,13 @@ export async function getEmployeesForGroups() {
     }));
   }
 
+  // Manager → employees + super admins (use separate groups; no mixing)
   if (profile.role === "manager") {
     const rows = await UserModel.find({
       deleted_at: null,
       is_active: true,
       approval_status: "approved",
-      role: "employee",
+      role: { $in: ["employee", "super_admin"] },
     })
       .sort({ full_name: 1 })
       .select("id full_name email role")

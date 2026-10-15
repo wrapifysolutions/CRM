@@ -18,16 +18,20 @@ export function AnimatedStat({
 }) {
   const body = (
     <>
-      <div className={cn("absolute inset-x-0 top-0 h-1 opacity-90", accent)} />
-      <div className="mb-3 flex items-center justify-between">
-        <p className="text-sm font-medium text-muted">{label}</p>
-        <div className="rounded-xl bg-brand-soft p-2 text-brand">{icon}</div>
+      <div className={cn("absolute inset-x-0 top-0 h-[3px]", accent)} />
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <p className="text-[12px] font-semibold uppercase tracking-[0.08em] text-muted">
+          {label}
+        </p>
+        <div className="rounded-xl bg-brand-soft p-2.5 text-brand shadow-[var(--shadow-sm)]">
+          {icon}
+        </div>
       </div>
-      <p className="text-3xl font-extrabold tracking-tight text-foreground">
+      <p className="text-[1.75rem] font-bold tracking-tight text-foreground tabular-nums sm:text-3xl">
         {value}
       </p>
       {href && (
-        <p className="mt-2 text-xs font-medium text-brand opacity-0 transition group-hover:opacity-100">
+        <p className="mt-3 text-xs font-semibold text-brand opacity-0 transition group-hover:opacity-100">
           View details →
         </p>
       )}
@@ -35,8 +39,8 @@ export function AnimatedStat({
   );
 
   const className = cn(
-    "group relative overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md",
-    href && "block cursor-pointer hover:border-brand/40"
+    "group relative overflow-hidden rounded-[1.1rem] border border-border bg-card p-5 shadow-[var(--shadow-sm)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[var(--shadow-md)]",
+    href && "block cursor-pointer hover:border-brand/30"
   );
 
   if (href) {

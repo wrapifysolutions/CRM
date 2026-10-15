@@ -1,12 +1,12 @@
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { FolderKanban, Plus } from "lucide-react";
 import { getProjects, softDeleteProjectAction } from "@/actions/projects";
 import { requireProfile } from "@/lib/auth";
 import { hasPermission, canViewFinance, canViewClients } from "@/lib/rbac";
 import { PROJECT_STATUSES } from "@/lib/constants";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -19,6 +19,8 @@ import { PriorityBadge, StatusBadge } from "@/components/shared/status-badges";
 import { Pagination } from "@/components/shared/pagination";
 import { ListFilters } from "@/components/shared/list-filters";
 import { DeleteButton } from "@/components/shared/delete-button";
+import { PageHeader } from "@/components/shared/page-header";
+import { EmptyState } from "@/components/shared/empty-state";
 
 export const metadata = { title: "Projects" };
 
@@ -31,6 +33,7 @@ export default async function ProjectsPage({
   const profile = await requireProfile();
   const showFinance = canViewFinance(profile.role);
   const showClients = canViewClients(profile.role);
+  const canCreate = hasPermission(profile.role, "projects.create");
   const result = await getProjects({
     page: Number(params.page || 1),
     search: params.search,
@@ -39,33 +42,36 @@ export default async function ProjectsPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-        <div>
-          <h1 className="text-2xl font-bold">Projects</h1>
-          <p className="text-slate-500">
-            {showClients
-              ? `${result.count} projects`
-              : `${result.count} projects assigned via your manager`}
-          </p>
-        </div>
-        {hasPermission(profile.role, "projects.create") && (
-          <Button asChild>
-            <Link href="/projects/new">
-              <Plus className="h-4 w-4" /> New Project
-            </Link>
-          </Button>
-        )}
-      </div>
+      <PageHeader
+        eyebrow="Delivery"
+        title="Projects"
+        description={
+          showClients
+            ? `${result.count} projects across your workspace`
+            : `${result.count} projects assigned via your manager`
+        }
+        actions={
+          canCreate ? (
+            <Button asChild className="w-full rounded-xl sm:w-auto">
+              <Link href="/projects/new">
+                <Plus className="h-4 w-4" /> New project
+              </Link>
+            </Button>
+          ) : undefined
+        }
+      />
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">All projects</CardTitle>
-          <ListFilters statusOptions={PROJECT_STATUSES} />
+      <Card className="overflow-hidden border-border/70">
+        <CardHeader className="space-y-3 border-b border-border/60 bg-surface/35 px-5 py-4">
+          <ListFilters
+            statusOptions={PROJECT_STATUSES}
+            searchPlaceholder="Search projects…"
+          />
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           <Table>
             <TableHeader>
-              <TableRow>
+              <TableRow className="hover:bg-transparent">
                 <TableHead>Project</TableHead>
                 {showClients && <TableHead>Client</TableHead>}
                 <TableHead>Status</TableHead>
@@ -73,22 +79,47 @@ export default async function ProjectsPage({
                 <TableHead>Progress</TableHead>
                 {showFinance && <TableHead>Budget</TableHead>}
                 <TableHead>Deadline</TableHead>
-                <TableHead />
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
+              {result.data.length === 0 && (
+                <TableRow className="hover:bg-transparent">
+                  <TableCell
+                    colSpan={
+                      5 + (showClients ? 1 : 0) + (showFinance ? 1 : 0) + 1
+                    }
+                    className="p-0"
+                  >
+                    <EmptyState
+                      icon={<FolderKanban className="h-5 w-5" />}
+                      title="No projects found"
+                      description="Create a project to start tracking delivery."
+                      action={
+                        canCreate ? (
+                          <Button asChild size="sm" className="rounded-xl">
+                            <Link href="/projects/new">
+                              <Plus className="h-4 w-4" /> New project
+                            </Link>
+                          </Button>
+                        ) : undefined
+                      }
+                    />
+                  </TableCell>
+                </TableRow>
+              )}
               {result.data.map((project) => (
                 <TableRow key={project.id}>
                   <TableCell>
                     <Link
                       href={`/projects/${project.id}`}
-                      className="font-medium text-brand hover:underline"
+                      className="font-semibold text-foreground transition hover:text-brand"
                     >
                       {project.name}
                     </Link>
                   </TableCell>
                   {showClients && (
-                    <TableCell>
+                    <TableCell className="text-muted">
                       {(project.client as { name?: string } | null)?.name ??
                         "—"}
                     </TableCell>
@@ -100,37 +131,52 @@ export default async function ProjectsPage({
                     <PriorityBadge value={project.priority} />
                   </TableCell>
                   <TableCell>
-                    <div className="flex items-center gap-2">
-                      <div className="h-2 w-16 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                    <div className="flex items-center gap-2.5">
+                      <div className="h-1.5 w-20 overflow-hidden rounded-full bg-surface">
                         <div
-                          className="h-full bg-brand"
-                          style={{ width: `${project.progress}%` }}
+                          className="h-full rounded-full bg-brand"
+                          style={{
+                            width: `${Math.min(100, Number(project.progress) || 0)}%`,
+                          }}
                         />
                       </div>
-                      <span className="text-xs">{project.progress}%</span>
+                      <span className="text-xs tabular-nums text-muted">
+                        {project.progress}%
+                      </span>
                     </div>
                   </TableCell>
                   {showFinance && (
-                    <TableCell>{formatCurrency(project.budget)}</TableCell>
+                    <TableCell className="tabular-nums">
+                      {formatCurrency(project.budget)}
+                    </TableCell>
                   )}
-                  <TableCell>{formatDate(project.deadline)}</TableCell>
-                  <TableCell>
-                    {hasPermission(profile.role, "projects.update") && (
-                      <DeleteButton
-                        action={softDeleteProjectAction.bind(null, project.id)}
-                      />
-                    )}
+                  <TableCell className="text-muted">
+                    {formatDate(project.deadline)}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-2">
+                      <Button asChild variant="outline" size="sm" className="rounded-lg">
+                        <Link href={`/projects/${project.id}`}>Open</Link>
+                      </Button>
+                      {hasPermission(profile.role, "projects.update") && (
+                        <DeleteButton
+                          action={softDeleteProjectAction.bind(null, project.id)}
+                        />
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
-          <Pagination
-            page={result.page}
-            totalPages={result.totalPages}
-            basePath="/projects"
-            searchParams={params}
-          />
+          <div className="border-t border-border/60 px-4 py-3">
+            <Pagination
+              page={result.page}
+              totalPages={result.totalPages}
+              basePath="/projects"
+              searchParams={params}
+            />
+          </div>
         </CardContent>
       </Card>
     </div>

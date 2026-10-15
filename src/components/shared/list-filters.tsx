@@ -9,9 +9,11 @@ import { Search } from "lucide-react";
 export function ListFilters({
   statusOptions,
   priorityOptions,
+  searchPlaceholder = "Search…",
 }: {
   statusOptions?: { value: string; label: string }[];
   priorityOptions?: { value: string; label: string }[];
+  searchPlaceholder?: string;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -29,12 +31,14 @@ export function ListFilters({
   }
 
   return (
-    <div className={`flex flex-col gap-3 sm:flex-row ${pending ? "opacity-70" : ""}`}>
-      <div className="relative flex-1">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+    <div
+      className={`flex flex-col gap-2.5 md:flex-row md:items-center ${pending ? "opacity-70" : ""}`}
+    >
+      <div className="relative min-w-0 flex-1">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
         <Input
-          className="pl-9"
-          placeholder="Search..."
+          className="h-10 w-full rounded-xl border-border/80 bg-card pl-9 shadow-none"
+          placeholder={searchPlaceholder}
           defaultValue={searchParams.get("search") ?? ""}
           onChange={(e) => {
             const value = e.target.value;
@@ -53,7 +57,7 @@ export function ListFilters({
         <Select
           defaultValue={searchParams.get("status") ?? ""}
           onChange={(e) => update("status", e.target.value)}
-          className="sm:w-40"
+          className="h-10 w-full rounded-xl border-border/80 md:w-44"
         >
           <option value="">All statuses</option>
           {statusOptions.map((o) => (
@@ -67,7 +71,7 @@ export function ListFilters({
         <Select
           defaultValue={searchParams.get("priority") ?? ""}
           onChange={(e) => update("priority", e.target.value)}
-          className="sm:w-40"
+          className="h-10 w-full rounded-xl border-border/80 md:w-44"
         >
           <option value="">All priorities</option>
           {priorityOptions.map((o) => (

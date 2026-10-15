@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getDashboardStats } from "@/actions/dashboard";
 import { requireProfile } from "@/lib/auth";
-import { hasPermission } from "@/lib/rbac";
+import { canViewFinance, hasPermission } from "@/lib/rbac";
 import { formatCurrency } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ExportReportButton } from "@/components/features/export-report-button";
@@ -14,6 +14,7 @@ export default async function ReportsPage() {
     redirect("/dashboard");
   }
 
+  const showFinance = canViewFinance(profile.role);
   const stats = await getDashboardStats();
 
   const reportRows = [
@@ -21,7 +22,7 @@ export default async function ReportsPage() {
     { metric: "Active Projects", value: stats.active_projects },
     { metric: "Completed Projects", value: stats.completed_projects },
     { metric: "Pending Tasks", value: stats.pending_tasks },
-    { metric: "Revenue", value: stats.revenue },
+    ...(showFinance ? [{ metric: "Revenue", value: stats.revenue }] : []),
     ...stats.employee_performance.map((e) => ({
       metric: `Employee: ${e.name}`,
       value: `${e.done}/${e.total} tasks done`,
@@ -33,12 +34,18 @@ export default async function ReportsPage() {
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <h1 className="text-2xl font-bold">Reports</h1>
-          <p className="text-slate-500">Performance and revenue overview</p>
+          <p className="text-slate-500">
+            {showFinance
+              ? "Performance and revenue overview"
+              : "Team and project performance overview"}
+          </p>
         </div>
         <ExportReportButton rows={reportRows} />
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div
+        className={`grid gap-4 sm:grid-cols-2 ${showFinance ? "lg:grid-cols-4" : "lg:grid-cols-3"}`}
+      >
         <Card>
           <CardHeader>
             <CardTitle className="text-sm text-slate-500">Clients</CardTitle>
@@ -67,14 +74,16 @@ export default async function ReportsPage() {
             {stats.completed_projects}
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm text-slate-500">Revenue</CardTitle>
-          </CardHeader>
-          <CardContent className="text-3xl font-bold">
-            {formatCurrency(stats.revenue)}
-          </CardContent>
-        </Card>
+        {showFinance ? (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm text-slate-500">Revenue</CardTitle>
+            </CardHeader>
+            <CardContent className="text-3xl font-bold">
+              {formatCurrency(stats.revenue)}
+            </CardContent>
+          </Card>
+        ) : null}
       </div>
 
       <Card>

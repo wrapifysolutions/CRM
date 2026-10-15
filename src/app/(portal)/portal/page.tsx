@@ -57,7 +57,7 @@ export default async function PortalHomePage() {
         <AnimatedStat
           label="Active"
           value={active}
-          accent="bg-[#3a6ea5]"
+          accent="bg-teal-600"
           icon={<Activity className="h-4 w-4" />}
         />
         <AnimatedStat
@@ -75,7 +75,7 @@ export default async function PortalHomePage() {
         <AnimatedStat
           label="Open tasks"
           value={openTasks}
-          accent="bg-[#3a6ea5]"
+          accent="bg-teal-600"
           icon={<ListTodo className="h-4 w-4" />}
         />
         <AnimatedStat
@@ -221,7 +221,7 @@ export default async function PortalHomePage() {
                 {recentDocuments.map((doc) => (
                   <li key={doc.id}>
                     <a
-                      href={`/api/files/${doc.file_path}`}
+                      href={doc.file_url || `/api/files/${doc.file_path}`}
                       className="text-sm text-brand hover:underline"
                       target="_blank"
                       rel="noreferrer"

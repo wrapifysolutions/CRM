@@ -11,6 +11,11 @@ import {
 } from "@/lib/db/models";
 import { UserModel } from "@/lib/auth/user-model";
 import { saveUpload, deleteUpload } from "@/lib/storage";
+import {
+  isRemoteUrl,
+  resolveFileUrl,
+  tryUploadToCloudinary,
+} from "@/lib/cloudinary";
 import { bustDocuments, bustPortal } from "@/lib/cache";
 import { hasPermission } from "@/lib/rbac";
 import { canAccessDocument } from "@/lib/security/file-access";
@@ -116,19 +121,12 @@ export async function getDocuments(params?: {
 
   return rows.map((d) => {
     const filePath = String(d.file_path ?? "");
-    const chatId = filePath.startsWith("chat://")
-      ? filePath.slice("chat://".length)
-      : null;
     return {
       id: String(d.id),
       name: String(d.name ?? d.file_name ?? "file"),
       file_name: String(d.file_name ?? d.name ?? "file"),
       file_path: filePath,
-      file_url: chatId
-        ? `/api/groups/files/${chatId}`
-        : filePath
-          ? `/api/files/${filePath}`
-          : null,
+      file_url: resolveFileUrl(filePath),
       file_size: d.file_size ? Number(d.file_size) : null,
       mime_type: d.mime_type ? String(d.mime_type) : null,
       entity_type: String(d.entity_type),
@@ -177,16 +175,37 @@ export async function uploadDocumentAction(
     return { success: false, error: "Permission denied" };
   }
 
-  const saved = await saveUpload(file, `${entity_type}/${entity_id}`);
+  const mime = file.type || "application/octet-stream";
+  const bytes = Buffer.from(await file.arrayBuffer());
+  let filePath: string;
+  let fileSize = bytes.length;
+  let mimeType: string | null = mime;
+
+  const cloud = await tryUploadToCloudinary({
+    buffer: bytes,
+    folder: `wrapcrm/${entity_type}/${entity_id}`,
+    filename: file.name,
+    mimeType: mime,
+  });
+
+  if (cloud) {
+    filePath = cloud.url;
+  } else {
+    const saved = await saveUpload(file, `${entity_type}/${entity_id}`);
+    filePath = saved.relativePath;
+    fileSize = saved.size;
+    mimeType = saved.mimeType;
+  }
+
   const id = newId();
 
   await DocumentModel.create({
     id,
     name: file.name,
     file_name: file.name,
-    file_path: saved.relativePath,
-    file_size: saved.size,
-    mime_type: saved.mimeType,
+    file_path: filePath,
+    file_size: fileSize,
+    mime_type: mimeType,
     entity_type,
     entity_id,
     uploaded_by: profile.id,
@@ -269,7 +288,10 @@ export async function softDeleteDocumentAction(
   }
 
   await DocumentModel.updateOne({ id }, { deleted_at: new Date() });
-  if (doc.file_path) await deleteUpload(doc.file_path);
+  const path = String(doc.file_path ?? "");
+  if (path && !isRemoteUrl(path) && !path.startsWith("chat://")) {
+    await deleteUpload(path);
+  }
 
   bustDocuments();
   if (profile.role === "client") bustPortal();

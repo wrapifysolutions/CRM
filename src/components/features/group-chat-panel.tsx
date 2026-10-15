@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Paperclip,
   Image as ImageIcon,
@@ -35,6 +35,9 @@ export type ChatMessage = {
 
 function attachmentUrl(a: ChatAttachment) {
   if (a.url) return a.url;
+  if (a.file_path?.startsWith("http://") || a.file_path?.startsWith("https://")) {
+    return a.file_path;
+  }
   if (a.file_id) return `/api/groups/files/${a.file_id}`;
   if (a.file_path) return `/api/files/${a.file_path}`;
   return null;
@@ -99,75 +102,126 @@ export function GroupChatPanel({
   const [live, setLive] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [files, setFiles] = useState<File[]>([]);
-  const [pending, startTransition] = useTransition();
+  const [pending, setPending] = useState(false);
   const [composerFocus, setComposerFocus] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const idsRef = useRef(new Set(initialMessages.map((m) => m.id)));
+  const lastAtRef = useRef(
+    initialMessages[initialMessages.length - 1]?.created_at ?? ""
+  );
+  const bodyRef = useRef<HTMLTextAreaElement | null>(null);
 
+  function mergeMessages(incoming: ChatMessage[]) {
+    if (!incoming.length) return;
+    setMessages((prev) => {
+      let changed = false;
+      const next = [...prev];
+      for (const msg of incoming) {
+        if (!msg?.id || idsRef.current.has(msg.id)) continue;
+        idsRef.current.add(msg.id);
+        next.push(msg);
+        changed = true;
+        if (msg.created_at > (lastAtRef.current || "")) {
+          lastAtRef.current = msg.created_at;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }
+
+  async function pullLatest() {
+    const after = lastAtRef.current;
+    const url = after
+      ? `/api/groups/${groupId}/messages?after=${encodeURIComponent(after)}`
+      : `/api/groups/${groupId}/messages`;
+    try {
+      const res = await fetch(url, { cache: "no-store" });
+      if (!res.ok) return;
+      const data = (await res.json()) as ChatMessage[];
+      if (Array.isArray(data)) mergeMessages(data);
+    } catch {
+      // ignore
+    }
+  }
+
+  // Seed / sync when server props change (first load or navigation)
   useEffect(() => {
     setMessages(initialMessages);
     idsRef.current = new Set(initialMessages.map((m) => m.id));
-  }, [initialMessages]);
+    lastAtRef.current =
+      initialMessages[initialMessages.length - 1]?.created_at ?? "";
+  }, [groupId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length]);
 
+  // Live stream + auto-reconnect
   useEffect(() => {
-    const last = initialMessages[initialMessages.length - 1]?.created_at;
-    const qs = last ? `?after=${encodeURIComponent(last)}` : "";
-    const es = new EventSource(`/api/groups/${groupId}/stream${qs}`);
+    let es: EventSource | null = null;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let stopped = false;
 
-    es.addEventListener("ready", () => setLive(true));
-    es.addEventListener("chat", (ev) => {
-      try {
-        const msg = JSON.parse((ev as MessageEvent).data) as ChatMessage;
-        if (!msg?.id || idsRef.current.has(msg.id)) return;
-        idsRef.current.add(msg.id);
-        setMessages((prev) => [...prev, msg]);
-      } catch {
-        // ignore
-      }
-    });
-    es.onerror = () => setLive(false);
+    const connect = () => {
+      if (stopped) return;
+      const after = lastAtRef.current;
+      const qs = after ? `?after=${encodeURIComponent(after)}` : "";
+      es = new EventSource(`/api/groups/${groupId}/stream${qs}`);
+
+      es.addEventListener("ready", () => setLive(true));
+      es.addEventListener("chat", (ev) => {
+        try {
+          const msg = JSON.parse((ev as MessageEvent).data) as ChatMessage;
+          if (msg?.id) mergeMessages([msg]);
+        } catch {
+          // ignore
+        }
+      });
+      es.addEventListener("ping", () => setLive(true));
+      es.onerror = () => {
+        setLive(false);
+        es?.close();
+        if (stopped) return;
+        retryTimer = setTimeout(connect, 1500);
+      };
+    };
+
+    connect();
+    void pullLatest();
 
     return () => {
-      es.close();
+      stopped = true;
+      if (retryTimer) clearTimeout(retryTimer);
+      es?.close();
       setLive(false);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupId]);
 
+  // Fast poll so chat stays instant even if SSE drops (e.g. multi-instance)
   useEffect(() => {
-    if (live) return;
-    const timer = setInterval(async () => {
-      const last = messages[messages.length - 1]?.created_at;
-      if (!last) return;
-      try {
-        const res = await fetch(
-          `/api/groups/${groupId}/messages?after=${encodeURIComponent(last)}`
-        );
-        if (!res.ok) return;
-        const data = (await res.json()) as ChatMessage[];
-        if (!Array.isArray(data) || data.length === 0) return;
-        setMessages((prev) => {
-          const next = [...prev];
-          for (const msg of data) {
-            if (!idsRef.current.has(msg.id)) {
-              idsRef.current.add(msg.id);
-              next.push(msg);
-            }
-          }
-          return next;
-        });
-      } catch {
-        // ignore
-      }
-    }, 8000);
+    const timer = setInterval(() => {
+      void pullLatest();
+    }, live ? 3000 : 1500);
     return () => clearInterval(timer);
-  }, [live, groupId, messages]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groupId, live]);
+
+  // Instant catch-up when tab becomes visible again
+  useEffect(() => {
+    const onFocus = () => {
+      void pullLatest();
+    };
+    document.addEventListener("visibilitychange", onFocus);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      document.removeEventListener("visibilitychange", onFocus);
+      window.removeEventListener("focus", onFocus);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groupId]);
 
   const filePreviews = useMemo(
     () =>
@@ -187,22 +241,47 @@ export function GroupChatPanel({
     };
   }, [filePreviews]);
 
-  function onSubmit(formData: FormData) {
+  async function onSubmit(formData: FormData) {
     setError(null);
     const payload = new FormData();
     payload.set("group_id", groupId);
     const body = String(formData.get("body") || "").trim();
     if (body) payload.set("body", body);
-    files.forEach((f) => payload.append("files", f));
+    const attached = [...files];
+    attached.forEach((f) => payload.append("files", f));
 
-    if (!body && files.length === 0) {
+    if (!body && attached.length === 0) {
       setError("Write a message or attach a file");
       return;
     }
 
-    startTransition(async () => {
+    const tempId = `temp-${Date.now()}`;
+    const optimistic: ChatMessage = {
+      id: tempId,
+      body,
+      sender_user_id: currentUserId,
+      created_at: new Date().toISOString(),
+      attachments: attached.map((f) => ({
+        file_name: f.name,
+        mime_type: f.type || null,
+        size: f.size,
+        url: f.type.startsWith("image/") ? URL.createObjectURL(f) : null,
+      })),
+      sender: { id: currentUserId, full_name: "You", role: "employee" },
+    };
+    idsRef.current.add(tempId);
+    setMessages((prev) => [...prev, optimistic]);
+    formRef.current?.reset();
+    setFiles([]);
+    if (fileRef.current) fileRef.current.value = "";
+    if (bodyRef.current) bodyRef.current.value = "";
+
+    setPending(true);
+    try {
       const result: ActionResult = await sendGroupMessageAction(null, payload);
       if (!result.success) {
+        setMessages((prev) => prev.filter((m) => m.id !== tempId));
+        idsRef.current.delete(tempId);
         setError(result.error ?? "Failed to send");
         return;
       }
@@ -212,15 +291,25 @@ export function GroupChatPanel({
         "id" in result.data
       ) {
         const msg = result.data as ChatMessage;
-        if (!idsRef.current.has(msg.id)) {
+        setMessages((prev) => {
+          const withoutTemp = prev.filter((m) => m.id !== tempId);
+          idsRef.current.delete(tempId);
+          if (idsRef.current.has(msg.id)) return withoutTemp;
           idsRef.current.add(msg.id);
-          setMessages((prev) => [...prev, msg]);
-        }
+          if (msg.created_at > (lastAtRef.current || "")) {
+            lastAtRef.current = msg.created_at;
+          }
+          return [...withoutTemp, msg];
+        });
       }
-      formRef.current?.reset();
-      setFiles([]);
-      if (fileRef.current) fileRef.current.value = "";
-    });
+      void pullLatest();
+    } catch {
+      setMessages((prev) => prev.filter((m) => m.id !== tempId));
+      idsRef.current.delete(tempId);
+      setError("Failed to send");
+    } finally {
+      setPending(false);
+    }
   }
 
   let lastDay = "";
@@ -235,16 +324,18 @@ export function GroupChatPanel({
   ];
 
   return (
-    <div className="animate-rise flex h-[min(74vh,760px)] min-h-[540px] flex-col overflow-hidden rounded-2xl border border-border/70 bg-card shadow-[0_24px_60px_-30px_rgba(15,23,42,0.5)] ring-1 ring-black/[0.03]">
-      <header className="relative z-10 flex items-center justify-between gap-3 border-b border-border/60 bg-gradient-to-r from-card via-card to-brand-soft/30 px-4 py-3.5 backdrop-blur-md">
-        <div className="flex items-center gap-3">
-          <div className="relative flex h-11 w-11 items-center justify-center rounded-2xl bg-brand text-white shadow-[0_8px_20px_-8px_var(--brand)]">
+    <div className="animate-rise flex h-[min(70dvh,720px)] min-h-[420px] flex-col overflow-hidden rounded-2xl border border-border/70 bg-card shadow-[0_24px_60px_-30px_rgba(15,23,42,0.5)] ring-1 ring-black/[0.03] sm:min-h-[500px] lg:h-[min(74vh,760px)]">
+      <header className="relative z-10 flex items-center justify-between gap-2 border-b border-border/60 bg-gradient-to-r from-card via-card to-brand-soft/30 px-3 py-3 backdrop-blur-md sm:gap-3 sm:px-4 sm:py-3.5">
+        <div className="flex min-w-0 items-center gap-2.5 sm:gap-3">
+          <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand text-white shadow-[0_8px_20px_-8px_var(--brand)] sm:h-11 sm:w-11">
             <MessagesSquare className="h-5 w-5" />
             <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-card bg-emerald-500 animate-live-dot" />
           </div>
-          <div>
-            <h2 className="text-[15px] font-semibold tracking-tight">{title}</h2>
-            <p className="text-[11px] text-muted">
+          <div className="min-w-0">
+            <h2 className="truncate text-sm font-semibold tracking-tight sm:text-[15px]">
+              {title}
+            </h2>
+            <p className="truncate text-[11px] text-muted">
               {messages.length} message{messages.length === 1 ? "" : "s"} · saved
               securely
             </p>
@@ -508,7 +599,7 @@ export function GroupChatPanel({
               type="button"
               variant="ghost"
               size="icon"
-              className="h-9 w-9 rounded-xl text-muted hover:bg-brand/10 hover:text-brand"
+              className="hidden h-9 w-9 rounded-xl text-muted hover:bg-brand/10 hover:text-brand sm:inline-flex"
               onClick={() => fileRef.current?.click()}
               title="Attach photo"
             >
@@ -516,6 +607,7 @@ export function GroupChatPanel({
             </Button>
           </div>
           <Textarea
+            ref={bodyRef}
             name="body"
             rows={1}
             placeholder="Write a message…"

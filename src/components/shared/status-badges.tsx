@@ -9,7 +9,7 @@ export function PriorityBadge({ value }: { value: PriorityLevel }) {
     urgent: "danger",
   } as const;
   return (
-    <Badge variant={map[value]} className="capitalize">
+    <Badge variant={map[value]} className="capitalize rounded-md">
       {value}
     </Badge>
   );
@@ -29,7 +29,7 @@ export function StatusBadge({
   return (
     <Badge
       variant={success ? "success" : danger ? "danger" : warning ? "warning" : "secondary"}
-      className="capitalize"
+      className="capitalize rounded-md"
     >
       {value.replaceAll("_", " ")}
     </Badge>

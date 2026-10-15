@@ -22,7 +22,9 @@ export default async function GroupsPage() {
 
   const canCreate = hasPermission(profile.role, "projects.update");
   const memberLabel =
-    profile.role === "manager" ? "employees" : "managers";
+    profile.role === "manager"
+      ? "employees or Super Admins"
+      : "managers";
   const [groups, projects, users] = await Promise.all([
     getStaffGroups(),
     canCreate ? getProjectOptions() : Promise.resolve([]),
@@ -34,18 +36,26 @@ export default async function GroupsPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Work groups</h1>
         <p className="text-muted">
-          Add employees by name, chat live, share files — messages stay in the
-          database after refresh.
+          {profile.role === "super_admin"
+            ? "Chat with managers only — create a group and add managers."
+            : profile.role === "manager"
+              ? "Chat with employees or Super Admins (separate groups). Assign tasks to employees."
+              : profile.role === "employee"
+                ? "Only groups your manager added you to appear here."
+                : "Add members, chat live, share files — messages stay after refresh."}
         </p>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,360px)]">
         <div className="space-y-3">
           {groups.length === 0 && (
             <Card className="border-border">
               <CardContent className="py-10 text-center text-sm text-muted">
-                No groups yet
-                {canCreate ? " — create one on the right." : "."}
+                {profile.role === "employee"
+                  ? "No groups yet. You will see a group here after your manager adds you."
+                  : canCreate
+                    ? "No groups yet — create one on the right."
+                    : "No groups yet."}
               </CardContent>
             </Card>
           )}
@@ -63,7 +73,7 @@ export default async function GroupsPage() {
                   </CardTitle>
                   <p className="mt-1 text-sm text-muted">
                     {g.project?.name ?? "Project"} · {g.members_users.length}{" "}
-                    employees
+                    members
                   </p>
                 </div>
                 <Button asChild size="sm" variant="outline">

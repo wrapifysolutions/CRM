@@ -36,8 +36,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "projects.create",
     "projects.update",
     "projects.view",
-    "tasks.create",
-    "tasks.assign",
+    // Super admin chats with managers only — no task assignment
     "tasks.update",
     "tasks.view",
     "reports.view",
@@ -79,7 +78,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "tasks.update",
     "tasks.view",
     "reports.view",
-    "finance.view",
+    // no finance.view — budget/pipeline/revenue are admin-only
     "documents.upload",
     "documents.view",
     "activity.view",
@@ -104,7 +103,7 @@ export function hasPermission(role: UserRole, permission: Permission) {
   return ROLE_PERMISSIONS[role]?.includes(permission) ?? false;
 }
 
-/** Budget, pipeline, revenue — hidden from employees. */
+/** Budget, pipeline, revenue — admin / super_admin only (not managers). */
 export function canViewFinance(role: UserRole) {
   return hasPermission(role, "finance.view");
 }

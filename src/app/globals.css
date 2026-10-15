@@ -3,40 +3,50 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /*
-  Light: steel-mist surfaces (not flat white) + readable graphite text
-  Dark: charcoal + soft steel
-  Tones pulled from the office-video / CRM brand feel
+  Rich professional — cool slate canvas, white panels, teal accent
 */
 :root {
-  --background: #d0dbe8;
-  --foreground: #0f172a;
-  --brand: #24548c;
-  --brand-hover: #1a3d68;
-  --brand-soft: #b8cce3;
-  --accent: #3a6ea5;
-  --card: #f5f8fc;
-  --muted: #3f5166;
-  --ring: #24548c;
-  --border: #94a8c0;
-  --surface: #bccce0;
-  --hero-cta: #d4deea;
-  --hero-cta-text: #0f172a;
+  --background: #f4f6f9;
+  --foreground: #0b1220;
+  --brand: #0f766e;
+  --brand-hover: #0b5f59;
+  --brand-soft: #e6f7f5;
+  --accent: #0d9488;
+  --card: #ffffff;
+  --muted: #5b6b7c;
+  --ring: #0d9488;
+  --border: #e2e8f0;
+  --surface: #f1f5f9;
+  --hero-cta: #0f766e;
+  --hero-cta-text: #ffffff;
+  --sidebar: #0b1220;
+  --sidebar-text: #e2e8f0;
+  --sidebar-muted: #94a3b8;
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 8px 24px -12px rgba(15, 23, 42, 0.12);
+  --shadow-lg: 0 18px 40px -20px rgba(15, 23, 42, 0.18);
 }
 
 .dark {
-  --background: #0b1018;
-  --foreground: #e8edf5;
-  --brand: #6b93c4;
-  --brand-hover: #8aafd4;
-  --brand-soft: #162338;
-  --accent: #7c9bc2;
-  --card: #141b26;
-  --muted: #9aa8b8;
-  --ring: #6b93c4;
-  --border: #2a3a52;
-  --surface: #101824;
-  --hero-cta: #d4deea;
-  --hero-cta-text: #0f172a;
+  --background: #0a0a0c;
+  --foreground: #f4f4f5;
+  --brand: #2dd4bf;
+  --brand-hover: #5eead4;
+  --brand-soft: #113f3c;
+  --accent: #14b8a6;
+  --card: #141418;
+  --muted: #a1a1aa;
+  --ring: #2dd4bf;
+  --border: #27272a;
+  --surface: #101014;
+  --hero-cta: #2dd4bf;
+  --hero-cta-text: #042f2e;
+  --sidebar: #050506;
+  --sidebar-text: #f4f4f5;
+  --sidebar-muted: #a1a1aa;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 8px 24px -12px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 18px 40px -20px rgba(0, 0, 0, 0.55);
 }
 
 @theme inline {
@@ -52,10 +62,24 @@
   --font-mono: var(--font-geist-mono);
 }
 
+html {
+  overflow-x: clip;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+  font-feature-settings: "ss01" on, "cv11" on;
+  letter-spacing: -0.011em;
+  text-rendering: optimizeLegibility;
+  overflow-x: clip;
+  min-width: 0;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--brand) 22%, white);
+  color: var(--foreground);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -438,15 +462,63 @@ body {
 }
 
 .mesh-bg {
-  background: linear-gradient(165deg, #d5dde8 0%, #e2e8f0 100%);
+  background: linear-gradient(165deg, #eef2f6 0%, #e2e8f0 55%, #f8fafc 100%);
 }
 
 .dark .mesh-bg {
-  background: linear-gradient(180deg, #0b1018 0%, #121925 100%);
+  background: linear-gradient(180deg, #09090b 0%, #121216 100%);
 }
 
 .page-panel {
   background: var(--card);
   border: 1px solid var(--border);
   color: var(--foreground);
+}
+
+/* —— App shell —— */
+.app-sidebar {
+  background:
+    radial-gradient(90% 60% at 0% 0%, rgba(20, 184, 166, 0.16), transparent 50%),
+    linear-gradient(180deg, #0f172a 0%, #0b1220 55%, #080d16 100%);
+  border-right: 1px solid rgba(148, 163, 184, 0.12);
+  box-shadow: 10px 0 40px -28px rgba(2, 6, 23, 0.55);
+}
+
+.app-sidebar-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.3) transparent;
+}
+
+.app-sidebar-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.app-sidebar-scroll::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.3);
+  border-radius: 999px;
+}
+
+.app-main {
+  background:
+    radial-gradient(ellipse 55% 35% at 100% -5%, rgba(15, 118, 110, 0.06), transparent 55%),
+    radial-gradient(ellipse 40% 30% at 0% 0%, rgba(15, 23, 42, 0.03), transparent 50%),
+    var(--background);
+}
+
+.dark .app-main {
+  background:
+    radial-gradient(ellipse 55% 35% at 100% -5%, rgba(45, 212, 191, 0.05), transparent 55%),
+    var(--background);
+}
+
+.ui-panel {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 1.1rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.ui-panel-header {
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface) 70%, var(--card));
 }

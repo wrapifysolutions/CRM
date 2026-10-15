@@ -12,27 +12,27 @@ function CountList({
   emptyLabel: string;
 }) {
   return (
-    <Card className="border-border">
-      <CardHeader>
-        <CardTitle className="text-base">{title}</CardTitle>
+    <Card className="border-border/70">
+      <CardHeader className="border-b border-border/60 bg-surface/35 px-5 py-4">
+        <CardTitle className="text-sm font-semibold">{title}</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-2">
+      <CardContent className="space-y-2 p-4">
         {rows.length === 0 && (
-          <p className="py-4 text-center text-sm text-muted">{emptyLabel}</p>
+          <p className="py-6 text-center text-sm text-muted">{emptyLabel}</p>
         )}
         {rows.map((row) => (
           <div
             key={row.id}
-            className="flex items-center justify-between gap-3 rounded-xl border border-border px-3 py-2.5"
+            className="flex items-center justify-between gap-3 rounded-2xl border border-border/70 bg-card px-3.5 py-3 transition hover:border-brand/25"
           >
             <div className="min-w-0">
-              <p className="truncate font-medium text-foreground">{row.name}</p>
+              <p className="truncate font-semibold text-foreground">{row.name}</p>
               <p className="text-xs text-muted">
                 {row.upcoming} upcoming · {row.past} past
               </p>
             </div>
-            <Badge variant="secondary" className="shrink-0">
-              {row.total} meeting{row.total === 1 ? "" : "s"}
+            <Badge variant="secondary" className="shrink-0 rounded-lg tabular-nums">
+              {row.total}
             </Badge>
           </div>
         ))}
@@ -45,8 +45,8 @@ export function MeetingCountSummary({
   byManager,
   byClient,
   showClients = true,
-  managerTitle = "Meetings by project manager",
-  clientTitle = "Meetings by client",
+  managerTitle = "By manager",
+  clientTitle = "By client",
 }: {
   byManager: MeetingCountRow[];
   byClient?: MeetingCountRow[];
@@ -55,9 +55,7 @@ export function MeetingCountSummary({
   clientTitle?: string;
 }) {
   return (
-    <div
-      className={`grid gap-6 ${showClients ? "lg:grid-cols-2" : ""}`}
-    >
+    <div className={`grid gap-6 ${showClients ? "lg:grid-cols-2" : ""}`}>
       <CountList
         title={managerTitle}
         rows={byManager}

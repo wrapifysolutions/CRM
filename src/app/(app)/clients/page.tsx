@@ -1,13 +1,13 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { Plus, Users } from "lucide-react";
 import { getClients, softDeleteClientAction } from "@/actions/clients";
 import { requireProfile } from "@/lib/auth";
 import { hasPermission, canViewFinance } from "@/lib/rbac";
 import { CLIENT_STATUSES, PRIORITIES } from "@/lib/constants";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -21,6 +21,8 @@ import { Pagination } from "@/components/shared/pagination";
 import { ListFilters } from "@/components/shared/list-filters";
 import { ExportClientsButton } from "@/components/features/export-clients-button";
 import { DeleteButton } from "@/components/shared/delete-button";
+import { PageHeader } from "@/components/shared/page-header";
+import { EmptyState } from "@/components/shared/empty-state";
 
 export const metadata = { title: "Clients" };
 
@@ -35,6 +37,7 @@ export default async function ClientsPage({
     redirect("/dashboard");
   }
   const showFinance = canViewFinance(profile.role);
+  const canCreate = hasPermission(profile.role, "clients.create");
   const result = await getClients({
     page: Number(params.page || 1),
     search: params.search,
@@ -44,35 +47,36 @@ export default async function ClientsPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-        <div>
-          <h1 className="text-2xl font-bold">Clients</h1>
-          <p className="text-slate-500">{result.count} total clients</p>
-        </div>
-        <div className="flex gap-2">
-          {showFinance && <ExportClientsButton clients={result.data} />}
-          {hasPermission(profile.role, "clients.create") && (
-            <Button asChild>
-              <Link href="/clients/new">
-                <Plus className="h-4 w-4" /> New Client
-              </Link>
-            </Button>
-          )}
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="CRM"
+        title="Clients"
+        description={`${result.count} total · manage relationships and account owners`}
+        actions={
+          <>
+            {showFinance && <ExportClientsButton clients={result.data} />}
+            {canCreate && (
+              <Button asChild className="w-full rounded-xl sm:w-auto">
+                <Link href="/clients/new">
+                  <Plus className="h-4 w-4" /> New client
+                </Link>
+              </Button>
+            )}
+          </>
+        }
+      />
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">All clients</CardTitle>
+      <Card className="overflow-hidden border-border/70">
+        <CardHeader className="space-y-3 border-b border-border/60 bg-surface/35 px-5 py-4">
           <ListFilters
             statusOptions={CLIENT_STATUSES}
             priorityOptions={PRIORITIES}
+            searchPlaceholder="Search clients…"
           />
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           <Table>
             <TableHeader>
-              <TableRow>
+              <TableRow className="hover:bg-transparent">
                 <TableHead>Name</TableHead>
                 <TableHead>Company</TableHead>
                 <TableHead>Status</TableHead>
@@ -80,17 +84,27 @@ export default async function ClientsPage({
                 {showFinance && <TableHead>Budget</TableHead>}
                 <TableHead>Manager</TableHead>
                 <TableHead>Created</TableHead>
-                <TableHead />
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {result.data.length === 0 && (
-                <TableRow>
-                  <TableCell
-                    colSpan={showFinance ? 8 : 7}
-                    className="py-10 text-center text-slate-500"
-                  >
-                    No clients found.
+                <TableRow className="hover:bg-transparent">
+                  <TableCell colSpan={showFinance ? 8 : 7} className="p-0">
+                    <EmptyState
+                      icon={<Users className="h-5 w-5" />}
+                      title="No clients found"
+                      description="Try another search, or create a new client to get started."
+                      action={
+                        canCreate ? (
+                          <Button asChild size="sm" className="rounded-xl">
+                            <Link href="/clients/new">
+                              <Plus className="h-4 w-4" /> New client
+                            </Link>
+                          </Button>
+                        ) : undefined
+                      }
+                    />
                   </TableCell>
                 </TableRow>
               )}
@@ -99,13 +113,13 @@ export default async function ClientsPage({
                   <TableCell>
                     <Link
                       href={`/clients/${client.id}`}
-                      className="font-medium text-brand hover:underline"
+                      className="font-semibold text-foreground transition hover:text-brand"
                     >
                       {client.name}
                     </Link>
-                    <p className="text-xs text-slate-500">{client.email}</p>
+                    <p className="mt-0.5 text-xs text-muted">{client.email}</p>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="text-muted">
                     {(client.company as { name?: string } | null)?.name ?? "—"}
                   </TableCell>
                   <TableCell>
@@ -115,16 +129,20 @@ export default async function ClientsPage({
                     <PriorityBadge value={client.priority} />
                   </TableCell>
                   {showFinance && (
-                    <TableCell>{formatCurrency(client.budget)}</TableCell>
+                    <TableCell className="tabular-nums">
+                      {formatCurrency(client.budget)}
+                    </TableCell>
                   )}
-                  <TableCell>
+                  <TableCell className="text-muted">
                     {(client.assigned_manager as { full_name?: string } | null)
                       ?.full_name ?? "—"}
                   </TableCell>
-                  <TableCell>{formatDate(client.created_at)}</TableCell>
+                  <TableCell className="text-muted">
+                    {formatDate(client.created_at)}
+                  </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
-                      <Button asChild variant="outline" size="sm">
+                      <Button asChild variant="outline" size="sm" className="rounded-lg">
                         <Link href={`/clients/${client.id}`}>View</Link>
                       </Button>
                       {hasPermission(profile.role, "clients.delete") && (
@@ -138,12 +156,14 @@ export default async function ClientsPage({
               ))}
             </TableBody>
           </Table>
-          <Pagination
-            page={result.page}
-            totalPages={result.totalPages}
-            basePath="/clients"
-            searchParams={params}
-          />
+          <div className="border-t border-border/60 px-4 py-3">
+            <Pagination
+              page={result.page}
+              totalPages={result.totalPages}
+              basePath="/clients"
+              searchParams={params}
+            />
+          </div>
         </CardContent>
       </Card>
     </div>

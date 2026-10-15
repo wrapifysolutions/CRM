@@ -16,6 +16,15 @@ import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { redirect } from "next/navigation";
 
+const portalLinks = [
+  { href: "/portal", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/portal/projects", label: "Projects", icon: FolderKanban },
+  { href: "/portal/meetings", label: "Meetings", icon: CalendarDays },
+  { href: "/portal/documents", label: "Documents", icon: FileText },
+  { href: "/portal/feedback", label: "Feedback", icon: MessageSquarePlus },
+  { href: "/portal/groups", label: "Groups", icon: MessagesSquare },
+] as const;
+
 export default async function PortalLayout({
   children,
 }: {
@@ -35,66 +44,63 @@ export default async function PortalLayout({
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <header className="sticky top-0 z-20 border-b border-border bg-card">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 lg:px-6">
-          <div className="flex items-center gap-6">
-            <div>
-              <Link href="/portal" className="text-lg font-extrabold text-brand">
-                {APP_NAME}
-              </Link>
-              <p className="text-[11px] font-medium uppercase tracking-wider text-muted">
-                {clientName} portal
-              </p>
-            </div>
-            <nav className="hidden items-center gap-1 sm:flex">
-              <Button asChild variant="ghost" size="sm">
-                <Link href="/portal">
-                  <LayoutDashboard className="h-4 w-4" /> Dashboard
-                </Link>
-              </Button>
-              <Button asChild variant="ghost" size="sm">
-                <Link href="/portal/projects">
-                  <FolderKanban className="h-4 w-4" /> Projects
-                </Link>
-              </Button>
-              <Button asChild variant="ghost" size="sm">
-                <Link href="/portal/meetings">
-                  <CalendarDays className="h-4 w-4" /> Meetings
-                </Link>
-              </Button>
-              <Button asChild variant="ghost" size="sm">
-                <Link href="/portal/documents">
-                  <FileText className="h-4 w-4" /> Documents
-                </Link>
-              </Button>
-              <Button asChild variant="ghost" size="sm">
-                <Link href="/portal/feedback">
-                  <MessageSquarePlus className="h-4 w-4" /> Feedback
-                </Link>
-              </Button>
-              <Button asChild variant="ghost" size="sm">
-                <Link href="/portal/groups">
-                  <MessagesSquare className="h-4 w-4" /> Groups
-                </Link>
-              </Button>
-            </nav>
+    <div className="min-h-dvh overflow-x-clip bg-background text-foreground">
+      <header className="sticky top-0 z-20 border-b border-border bg-card/90 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-3 py-3 sm:px-4 lg:px-6">
+          <div className="min-w-0">
+            <Link
+              href="/portal"
+              className="text-base font-extrabold text-brand sm:text-lg"
+            >
+              {APP_NAME}
+            </Link>
+            <p className="truncate text-[10px] font-medium uppercase tracking-wider text-muted sm:text-[11px]">
+              {clientName} portal
+            </p>
           </div>
-          <div className="flex items-center gap-2">
-            <p className="hidden text-sm text-muted md:block">
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+            <p className="hidden text-sm text-muted lg:block">
               {profile.full_name}
             </p>
             <ThemeToggle />
             <form action={logoutAction}>
-              <Button type="submit" variant="outline" size="sm">
+              <Button type="submit" variant="outline" size="sm" className="rounded-xl">
                 <LogOut className="h-4 w-4" />
-                Logout
+                <span className="hidden sm:inline">Logout</span>
               </Button>
             </form>
           </div>
         </div>
+
+        {/* Desktop nav */}
+        <nav className="mx-auto hidden max-w-6xl items-center gap-1 px-4 pb-3 sm:flex lg:px-6">
+          {portalLinks.map(({ href, label, icon: Icon }) => (
+            <Button key={href} asChild variant="ghost" size="sm" className="rounded-lg">
+              <Link href={href}>
+                <Icon className="h-4 w-4" /> {label}
+              </Link>
+            </Button>
+          ))}
+        </nav>
+
+        {/* Mobile horizontal nav */}
+        <nav className="flex gap-1 overflow-x-auto overscroll-x-contain px-3 pb-3 sm:hidden [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {portalLinks.map(({ href, label, icon: Icon }) => (
+            <Link
+              key={href}
+              href={href}
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-surface/60 px-3 py-1.5 text-xs font-semibold text-foreground"
+            >
+              <Icon className="h-3.5 w-3.5 text-brand" />
+              {label}
+            </Link>
+          ))}
+        </nav>
       </header>
-      <main className="mx-auto max-w-6xl px-4 py-8 lg:px-6">{children}</main>
+
+      <main className="mx-auto max-w-6xl px-3 py-5 sm:px-4 sm:py-8 lg:px-6">
+        {children}
+      </main>
     </div>
   );
 }

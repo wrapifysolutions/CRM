@@ -17,6 +17,7 @@ import { UserModel } from "@/lib/auth/user-model";
 import { hasPermission, isStaffRole } from "@/lib/rbac";
 import { createNotification } from "@/lib/activity";
 import { notifyApproversOfRegistration } from "@/actions/approvals";
+import { resolveFileUrl } from "@/lib/cloudinary";
 import type { ActionResult } from "@/core/types/result";
 import { bustPortal, bustClients, bustUsers } from "@/lib/cache";
 import type { ApprovalStatus } from "@/types/database";
@@ -240,6 +241,7 @@ export async function getPortalProject(projectId: string) {
       id: String(d.id),
       file_name: String(d.file_name ?? d.name ?? "file"),
       file_path: String(d.file_path),
+      file_url: resolveFileUrl(String(d.file_path)),
       created_at: toIso(d.created_at as Date) ?? new Date().toISOString(),
     })),
     meetings: meetings.map((m) => ({
@@ -586,6 +588,7 @@ async function loadPortalOverviewForUser(portalUserId: string) {
       id: String(d.id),
       file_name: String(d.file_name ?? d.name ?? "file"),
       file_path: String(d.file_path),
+      file_url: resolveFileUrl(String(d.file_path)),
       entity_type: String(d.entity_type),
       created_at: toIso(d.created_at as Date) ?? new Date().toISOString(),
     })),

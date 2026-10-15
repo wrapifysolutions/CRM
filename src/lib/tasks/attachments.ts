@@ -1,8 +1,16 @@
 import { ChatFileModel, DocumentModel, newId } from "@/lib/db/models";
+import { isRemoteUrl, tryUploadToCloudinary } from "@/lib/cloudinary";
 
 const MAX_BYTES = 6 * 1024 * 1024;
 const ALLOWED_EXT =
   /\.(jpe?g|png|gif|webp|heic|heif|pdf|doc|docx|xls|xlsx|txt|csv)$/i;
+
+const WORD_MIME =
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+const WORD_LEGACY = "application/msword";
+const EXCEL_MIME =
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+const EXCEL_LEGACY = "application/vnd.ms-excel";
 
 export function isUploadedFile(value: FormDataEntryValue): value is File {
   if (typeof value !== "object" || value === null) return false;
@@ -23,6 +31,10 @@ export function validateTaskAttachment(file: File): string | null {
     mime === "application/pdf" ||
     mime === "text/plain" ||
     mime === "text/csv" ||
+    mime === WORD_MIME ||
+    mime === WORD_LEGACY ||
+    mime === EXCEL_MIME ||
+    mime === EXCEL_LEGACY ||
     ALLOWED_EXT.test(file.name);
   if (!ok) {
     return `${file.name}: only images, PDF, Word, Excel, or text allowed`;
@@ -30,14 +42,17 @@ export function validateTaskAttachment(file: File): string | null {
   return null;
 }
 
-/** Persist attachment in MongoDB (Vercel-safe) and index as a Document row. */
+/**
+ * Prefer Cloudinary (images + docs). Fall back to Mongo chat:// if Cloudinary
+ * is missing or rejects the upload (so assign/chat never hard-fails).
+ */
 export async function saveTaskAttachments(params: {
   files: File[];
   taskId: string;
   uploadedBy: string;
   projectId?: string | null;
 }) {
-  const saved: { id: string; name: string }[] = [];
+  const saved: { id: string; name: string; url?: string }[] = [];
 
   for (const file of params.files.slice(0, 5)) {
     const err = validateTaskAttachment(file);
@@ -47,21 +62,35 @@ export async function saveTaskAttachments(params: {
     const fileId = newId();
     const mime = file.type || "application/octet-stream";
 
-    await ChatFileModel.create({
-      id: fileId,
-      group_id: `task:${params.taskId}`,
-      message_id: params.taskId,
-      uploaded_by: params.uploadedBy,
-      file_name: file.name,
-      mime_type: mime,
-      size: bytes.length,
-      data: bytes,
+    const cloud = await tryUploadToCloudinary({
+      buffer: bytes,
+      folder: `wrapcrm/tasks/${params.taskId}`,
+      filename: file.name,
+      mimeType: mime,
     });
+
+    let filePath: string;
+    if (cloud) {
+      filePath = cloud.url;
+    } else {
+      await ChatFileModel.create({
+        id: fileId,
+        group_id: `task:${params.taskId}`,
+        message_id: params.taskId,
+        uploaded_by: params.uploadedBy,
+        file_name: file.name,
+        mime_type: mime,
+        size: bytes.length,
+        data: bytes,
+      });
+      filePath = `chat://${fileId}`;
+    }
 
     await DocumentModel.create({
       id: newId(),
       name: file.name,
-      file_path: `chat://${fileId}`,
+      file_name: file.name,
+      file_path: filePath,
       file_size: bytes.length,
       mime_type: mime,
       entity_type: "task",
@@ -69,7 +98,11 @@ export async function saveTaskAttachments(params: {
       uploaded_by: params.uploadedBy,
     });
 
-    saved.push({ id: fileId, name: file.name });
+    saved.push({
+      id: fileId,
+      name: file.name,
+      url: isRemoteUrl(filePath) ? filePath : undefined,
+    });
   }
 
   return saved;

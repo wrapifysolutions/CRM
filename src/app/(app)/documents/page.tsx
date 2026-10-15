@@ -52,7 +52,20 @@ export default async function DocumentsPage() {
               )}
               {docs.map((doc) => (
                 <TableRow key={doc.id}>
-                  <TableCell className="font-medium">{doc.name}</TableCell>
+                  <TableCell className="font-medium">
+                    {doc.file_url ? (
+                      <a
+                        href={doc.file_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="hover:underline"
+                      >
+                        {doc.name}
+                      </a>
+                    ) : (
+                      doc.name
+                    )}
+                  </TableCell>
                   <TableCell>
                     <Badge variant="outline" className="capitalize">
                       {doc.entity_type}

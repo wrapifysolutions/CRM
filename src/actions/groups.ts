@@ -17,10 +17,15 @@ import {
 } from "@/lib/db/models";
 import { UserModel } from "@/lib/auth/user-model";
 import { createNotification, logActivity } from "@/lib/activity";
-import { hasPermission, isStaffRole } from "@/lib/rbac";
+import { hasPermission } from "@/lib/rbac";
 import { bustGroups, bustTasks } from "@/lib/cache";
 import { sendGroupAssignmentEmail } from "@/lib/mail";
 import { publishGroupChat } from "@/lib/groups/chat-bus";
+import {
+  isRemoteUrl,
+  resolveFileUrl,
+  tryUploadToCloudinary,
+} from "@/lib/cloudinary";
 import type { ActionResult } from "@/core/types/result";
 
 const notDeleted = {
@@ -30,6 +35,12 @@ const notDeleted = {
 const MAX_CHAT_FILE_BYTES = 6 * 1024 * 1024;
 const ALLOWED_CHAT_EXT =
   /\.(jpe?g|png|gif|webp|heic|heif|pdf|doc|docx|xls|xlsx|txt|csv)$/i;
+const WORD_MIME =
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+const WORD_LEGACY = "application/msword";
+const EXCEL_MIME =
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+const EXCEL_LEGACY = "application/vnd.ms-excel";
 
 function isUploadedFile(value: FormDataEntryValue): value is File {
   if (typeof value !== "object" || value === null) return false;
@@ -64,12 +75,22 @@ export async function assertCanAccessGroup(
     member_client_ids?: string[];
   }
 ) {
-  if (profile.role === "super_admin" || profile.role === "admin") return;
+  // Admin may oversee any group; super_admin must be a member (managers-only chats).
+  if (profile.role === "admin") return;
 
-  if (isStaffRole(profile.role as "manager" | "employee")) {
+  // Employees may only open groups they were explicitly added to
+  if (profile.role === "employee") {
+    const memberIds = (group.member_user_ids ?? []).map(String);
+    if (!memberIds.includes(profile.id)) {
+      throw new Error("Not a member of this group");
+    }
+    return;
+  }
+
+  if (profile.role === "super_admin" || profile.role === "manager") {
     const inGroup =
       String(group.created_by) === profile.id ||
-      (group.member_user_ids ?? []).includes(profile.id);
+      (group.member_user_ids ?? []).map(String).includes(profile.id);
     if (!inGroup) throw new Error("Not a member of this group");
     return;
   }
@@ -107,11 +128,10 @@ function mapMessage(
           file_name: String(a.file_name),
           mime_type: a.mime_type ? String(a.mime_type) : null,
           size: Number(a.size || 0),
-          url: fileId
-            ? `/api/groups/files/${fileId}`
-            : filePath
-              ? `/api/files/${filePath}`
-              : null,
+          url:
+            (filePath && isRemoteUrl(filePath) ? filePath : null) ||
+            (fileId ? `/api/groups/files/${fileId}` : null) ||
+            resolveFileUrl(filePath),
         };
       })
     : [];
@@ -241,12 +261,22 @@ export async function getStaffGroups() {
 
   await connectMongo();
   let rows;
-  if (profile.role === "super_admin" || profile.role === "admin") {
+  if (profile.role === "admin") {
     rows = await WorkGroupModel.find(notDeleted)
       .sort({ updated_at: -1 })
       .limit(100)
       .lean();
+  } else if (profile.role === "employee") {
+    // Employees only see groups they were added to (not creator bypass)
+    rows = await WorkGroupModel.find({
+      ...notDeleted,
+      member_user_ids: profile.id,
+    })
+      .sort({ updated_at: -1 })
+      .limit(100)
+      .lean();
   } else {
+    // Super admin / manager: groups they created or belong to
     rows = await WorkGroupModel.find({
       ...notDeleted,
       $or: [{ created_by: profile.id }, { member_user_ids: profile.id }],
@@ -298,18 +328,20 @@ async function filterMembersByCreatorRole(
   const ids = uniqueIds(memberIds).filter((id) => id !== creatorId);
   if (ids.length === 0) return [] as string[];
 
-  let allowedRole: string;
+  // SA/admin → managers only
+  // Manager → employees and/or super admins (separate chats; see assertNoMixedSaEmployees)
+  let allowedRoles: string[];
   if (creatorRole === "super_admin" || creatorRole === "admin") {
-    allowedRole = "manager";
+    allowedRoles = ["manager"];
   } else if (creatorRole === "manager") {
-    allowedRole = "employee";
+    allowedRoles = ["employee", "super_admin"];
   } else {
     return [];
   }
 
   const rows = await UserModel.find({
     id: { $in: ids },
-    role: allowedRole,
+    role: { $in: allowedRoles },
     deleted_at: null,
     is_active: true,
     approval_status: "approved",
@@ -318,6 +350,26 @@ async function filterMembersByCreatorRole(
     .lean();
 
   return rows.map((r) => String(r.id));
+}
+
+/** Super admin must never share a chat room with employees. */
+async function assertNoMixedSaEmployees(memberIds: string[]) {
+  const ids = uniqueIds(memberIds);
+  if (ids.length === 0) return;
+
+  const rows = await UserModel.find({
+    id: { $in: ids },
+    deleted_at: null,
+  })
+    .select("role")
+    .lean();
+
+  const roles = new Set(rows.map((r) => String(r.role)));
+  if (roles.has("super_admin") && roles.has("employee")) {
+    throw new Error(
+      "Keep Super Admin and employees in separate groups — Super Admin chats with managers only"
+    );
+  }
 }
 
 export async function createGroupAction(
@@ -347,6 +399,14 @@ export async function createGroupAction(
     formData.getAll("member_user_ids") as string[]
   );
   const memberUserIds = uniqueIds([profile.id, ...picked]);
+  try {
+    await assertNoMixedSaEmployees(memberUserIds);
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Invalid members",
+    };
+  }
   // Keep project client on the group for portal access (no UI picker).
   const memberClientIds = uniqueIds([
     project.client_id ? String(project.client_id) : "",
@@ -410,6 +470,14 @@ export async function updateGroupMembersAction(
     profile.id,
     ...picked,
   ]);
+  try {
+    await assertNoMixedSaEmployees(memberUserIds);
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Invalid members",
+    };
+  }
 
   await WorkGroupModel.updateOne(
     { id: groupId },
@@ -513,12 +581,15 @@ export async function sendGroupMessageAction(
       return { success: false, error: `${file.name} is larger than 6MB` };
     }
     const mime = file.type || "application/octet-stream";
-    const isImage = mime.startsWith("image/") || ALLOWED_CHAT_EXT.test(file.name);
     const allowed =
-      isImage ||
+      mime.startsWith("image/") ||
       mime === "application/pdf" ||
       mime === "text/plain" ||
       mime === "text/csv" ||
+      mime === WORD_MIME ||
+      mime === WORD_LEGACY ||
+      mime === EXCEL_MIME ||
+      mime === EXCEL_LEGACY ||
       ALLOWED_CHAT_EXT.test(file.name);
     if (!allowed) {
       return {
@@ -529,30 +600,45 @@ export async function sendGroupMessageAction(
 
     const bytes = Buffer.from(await file.arrayBuffer());
     const fileId = newId();
-    await ChatFileModel.create({
-      id: fileId,
-      group_id: groupId,
-      message_id: messageId,
-      uploaded_by: profile.id,
-      file_name: file.name,
-      mime_type: mime,
-      size: bytes.length,
-      data: bytes,
+
+    const cloud = await tryUploadToCloudinary({
+      buffer: bytes,
+      folder: `wrapcrm/groups/${groupId}`,
+      filename: file.name,
+      mimeType: mime,
     });
+
+    let storedPath: string;
+    if (cloud) {
+      storedPath = cloud.url;
+    } else {
+      await ChatFileModel.create({
+        id: fileId,
+        group_id: groupId,
+        message_id: messageId,
+        uploaded_by: profile.id,
+        file_name: file.name,
+        mime_type: mime,
+        size: bytes.length,
+        data: bytes,
+      });
+      storedPath = `chat://${fileId}`;
+    }
 
     attachments.push({
       file_id: fileId,
-      file_path: null,
+      file_path: isRemoteUrl(storedPath) ? storedPath : null,
       file_name: file.name,
       mime_type: mime,
       size: bytes.length,
     });
 
-    // Keep a project document index for staff document lists (no disk path).
+    // Keep a project document index for staff document lists.
     await DocumentModel.create({
       id: newId(),
       name: file.name,
-      file_path: `chat://${fileId}`,
+      file_name: file.name,
+      file_path: storedPath,
       file_size: bytes.length,
       mime_type: mime,
       entity_type: "project",
@@ -590,9 +676,7 @@ export async function sendGroupMessageAction(
 
   publishGroupChat(groupId, payload);
 
-  bustGroups();
-  revalidatePath(`/groups/${groupId}`);
-  revalidatePath(`/portal/groups/${groupId}`);
+  // Live UI is driven by SSE + client poll — avoid full page revalidate on every message
   return { success: true, data: payload };
 }
 
@@ -653,6 +737,12 @@ export async function createGroupTaskAction(
   formData: FormData
 ): Promise<ActionResult> {
   const profile = await requireStaffProfile();
+  if (profile.role === "super_admin") {
+    return {
+      success: false,
+      error: "Super Admin chats with managers only — task assignment is for managers",
+    };
+  }
   if (!hasPermission(profile.role, "tasks.create")) {
     return { success: false, error: "Permission denied" };
   }
@@ -676,6 +766,23 @@ export async function createGroupTaskAction(
   let filtered: string[];
   if (profile.role === "manager") {
     // Managers may assign any approved employee (and add them to the group).
+    // Never mix employees into a Super Admin chat room.
+    try {
+      await assertNoMixedSaEmployees([
+        ...(group.member_user_ids ?? []).map(String),
+        String(group.created_by ?? ""),
+        ...assigneeIds,
+      ]);
+    } catch (error) {
+      return {
+        success: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Cannot assign employees in a Super Admin chat",
+      };
+    }
+
     const employees = await UserModel.find({
       id: { $in: assigneeIds },
       role: "employee",

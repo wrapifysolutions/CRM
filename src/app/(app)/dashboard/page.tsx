@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { AnimatedStat } from "@/components/features/animated-stat";
 import { DashboardChartsLazy } from "@/components/features/dashboard-charts-lazy";
+import { PageHeader } from "@/components/shared/page-header";
 
 export const metadata = { title: "Dashboard" };
 
@@ -36,47 +37,42 @@ export default async function DashboardPage() {
   const showClients = canViewClients(profile.role);
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand">
-            {APP_NAME} workspace
-          </p>
-          <h1 className="text-3xl font-extrabold tracking-tight text-foreground">
-            Dashboard
-          </h1>
-          <p className="text-muted">
-            Hello {profile.full_name} —{" "}
-            {showClients
-              ? "live analytics for clients, projects & team"
-              : "your projects, tasks & team workload"}
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {pending.length > 0 && (
-            <Button asChild variant="outline">
-              <Link href="/approvals">
-                <UserCheck className="h-4 w-4" />
-                {pending.length} pending
-              </Link>
-            </Button>
-          )}
-          {hasPermission(profile.role, "clients.create") && (
-            <Button asChild>
-              <Link href="/clients/new">
-                <Plus className="h-4 w-4" /> New Client
-              </Link>
-            </Button>
-          )}
-          {hasPermission(profile.role, "projects.create") && (
-            <Button asChild variant="outline">
-              <Link href="/projects/new">
-                <Plus className="h-4 w-4" /> New Project
-              </Link>
-            </Button>
-          )}
-        </div>
-      </div>
+    <div className="space-y-7">
+      <PageHeader
+        eyebrow={`${APP_NAME} workspace`}
+        title="Dashboard"
+        description={
+          showClients
+            ? `Hello ${profile.full_name} — live analytics for clients, projects & team`
+            : `Hello ${profile.full_name} — your projects, tasks & team workload`
+        }
+        actions={
+          <>
+            {pending.length > 0 && (
+              <Button asChild variant="outline">
+                <Link href="/approvals">
+                  <UserCheck className="h-4 w-4" />
+                  {pending.length} pending
+                </Link>
+              </Button>
+            )}
+            {hasPermission(profile.role, "clients.create") && (
+              <Button asChild>
+                <Link href="/clients/new">
+                  <Plus className="h-4 w-4" /> New client
+                </Link>
+              </Button>
+            )}
+            {hasPermission(profile.role, "projects.create") && (
+              <Button asChild variant="outline">
+                <Link href="/projects/new">
+                  <Plus className="h-4 w-4" /> New project
+                </Link>
+              </Button>
+            )}
+          </>
+        }
+      />
 
       <div
         className={`grid gap-4 sm:grid-cols-2 xl:grid-cols-4 ${
@@ -94,7 +90,7 @@ export default async function DashboardPage() {
             <AnimatedStat
               label="Active Clients"
               value={stats.active_clients}
-              accent="bg-[#3a6ea5]"
+              accent="bg-teal-600"
               icon={<Briefcase className="h-4 w-4" />}
             />
           </>
@@ -102,26 +98,26 @@ export default async function DashboardPage() {
         <AnimatedStat
           label="Active Projects"
           value={stats.active_projects}
-          accent="bg-[#1a2332] dark:bg-[#7c9bc2]"
+          accent="bg-slate-800 dark:bg-teal-400"
           icon={<FolderKanban className="h-4 w-4" />}
         />
         <AnimatedStat
           label="Completed"
           value={stats.completed_projects}
-          accent="bg-[#3d6a9f]"
+          accent="bg-teal-500"
           icon={<FolderKanban className="h-4 w-4" />}
         />
         <AnimatedStat
           label="Pending Tasks"
           value={stats.pending_tasks}
-          accent="bg-[#5c6b7a]"
+          accent="bg-slate-500"
           icon={<CheckSquare className="h-4 w-4" />}
         />
         {showClients && (
           <AnimatedStat
             label="Meetings"
             value={stats.meetings_scheduled}
-            accent="bg-[#3a6ea5]"
+            accent="bg-emerald-600"
             icon={<CalendarDays className="h-4 w-4" />}
           />
         )}
@@ -137,11 +133,11 @@ export default async function DashboardPage() {
       </div>
 
       {showFinance && showClients && (
-        <Card id="pipeline" className="scroll-mt-24 border-border shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between">
+        <Card id="pipeline" className="scroll-mt-24 overflow-hidden">
+          <CardHeader className="flex flex-row items-center justify-between border-b border-border/60 bg-surface/40">
             <div>
               <CardTitle>Pipeline clients</CardTitle>
-              <p className="mt-1 text-sm text-muted">
+              <p className="mt-1.5 text-sm text-muted">
                 Lead & active clients with their budgets — click for details.
               </p>
             </div>
@@ -149,7 +145,7 @@ export default async function DashboardPage() {
               <Link href="/clients">All clients</Link>
             </Button>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-3 pt-5">
             {stats.pipeline_clients.length === 0 && (
               <p className="text-sm text-muted">
                 No lead/active clients yet. Add a client budget to see it here.
@@ -159,7 +155,7 @@ export default async function DashboardPage() {
               <Link
                 key={client.id}
                 href={`/clients/${client.id}`}
-                className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card/60 px-4 py-3 transition hover:border-brand/40 hover:bg-brand-soft/30"
+                className="flex items-center justify-between gap-3 rounded-2xl border border-border/80 bg-surface/40 px-4 py-3.5 transition hover:border-brand/30 hover:bg-brand-soft/40"
               >
                 <div className="min-w-0">
                   <p className="truncate font-semibold text-foreground">
@@ -196,14 +192,14 @@ export default async function DashboardPage() {
       />
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card className="border-border shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between">
+        <Card className="overflow-hidden">
+          <CardHeader className="flex flex-row items-center justify-between border-b border-border/60 bg-surface/40">
             <CardTitle>Live projects</CardTitle>
             <Button asChild variant="ghost" size="sm">
               <Link href="/projects">View all</Link>
             </Button>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-3 pt-5">
             {stats.recent_projects.length === 0 && (
               <p className="text-sm text-muted">No projects yet.</p>
             )}
@@ -211,7 +207,7 @@ export default async function DashboardPage() {
               <Link
                 key={project.id}
                 href={`/projects/${project.id}`}
-                className="block rounded-xl border border-border bg-card/60 p-3 transition hover:border-brand/40 hover:bg-brand-soft/30"
+                className="block rounded-2xl border border-border/80 bg-surface/40 p-3.5 transition hover:border-brand/30 hover:bg-brand-soft/40"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
@@ -253,8 +249,8 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-border shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between">
+        <Card className="overflow-hidden">
+          <CardHeader className="flex flex-row items-center justify-between border-b border-border/60 bg-surface/40">
             <CardTitle>Recent activity</CardTitle>
             {hasPermission(profile.role, "activity.view") && (
               <Button asChild variant="ghost" size="sm">
@@ -262,14 +258,14 @@ export default async function DashboardPage() {
               </Button>
             )}
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-0 divide-y divide-border/60 p-0">
             {stats.recent_activity.length === 0 && (
-              <p className="text-sm text-muted">No activity yet.</p>
+              <p className="p-5 text-sm text-muted">No activity yet.</p>
             )}
             {stats.recent_activity.map((log) => (
               <div
                 key={String(log.id)}
-                className="flex items-start justify-between gap-3 border-b border-border pb-3 last:border-0"
+                className="flex items-start justify-between gap-3 px-5 py-3.5"
               >
                 <div>
                   <p className="text-sm font-medium text-foreground">

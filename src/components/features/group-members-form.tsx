@@ -108,8 +108,8 @@ export function GroupMembersForm({
           ))}
         </div>
         <p className="text-xs text-muted">
-          Newly added {memberLabel} receive an email about the project
-          assignment.
+          Newly added members get an email. Keep Super Admins and employees in
+          separate groups.
         </p>
       </div>
     </FormShell>

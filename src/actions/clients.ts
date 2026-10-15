@@ -3,7 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { requireProfile } from "@/lib/auth";
 import { logActivity, createNotification } from "@/lib/activity";
-import { hasPermission, redactBudget, redactBudgetList } from "@/lib/rbac";
+import {
+  canViewFinance,
+  hasPermission,
+  redactBudget,
+  redactBudgetList,
+} from "@/lib/rbac";
 import { connectMongo } from "@/lib/mongodb";
 import { ClientModel, CompanyModel, ProjectModel, newId, toIso } from "@/lib/db/models";
 import { UserModel } from "@/lib/auth/user-model";
@@ -247,9 +252,11 @@ export async function createClientAction(
 
   await connectMongo();
   const id = newId();
+  const allowFinance = canViewFinance(profile.role);
   const doc = await ClientModel.create({
     id,
     ...parsed.data,
+    budget: allowFinance ? parsed.data.budget : 0,
     company_id: parsed.data.company_id || null,
     assigned_manager_id: parsed.data.assigned_manager_id || null,
     deadline: parsed.data.deadline || null,
@@ -309,10 +316,13 @@ export async function updateClientAction(
   }
 
   await connectMongo();
+  const allowFinance = canViewFinance(profile.role);
+  const { budget: parsedBudget, ...clientFields } = parsed.data;
   const updated = await ClientModel.findOneAndUpdate(
     { id, ...notDeleted },
     {
-      ...parsed.data,
+      ...clientFields,
+      ...(allowFinance ? { budget: parsedBudget } : {}),
       company_id: parsed.data.company_id || null,
       assigned_manager_id: parsed.data.assigned_manager_id || null,
       deadline: parsed.data.deadline || null,
@@ -325,8 +335,8 @@ export async function updateClientAction(
   if (!updated) return { success: false, error: "Client not found" };
 
   // Keep linked projects in sync when client budget was empty on the project.
-  const nextBudget = Number(parsed.data.budget ?? 0);
-  if (nextBudget > 0) {
+  const nextBudget = Number(parsedBudget ?? 0);
+  if (allowFinance && nextBudget > 0) {
     await ProjectModel.updateMany(
       {
         client_id: id,

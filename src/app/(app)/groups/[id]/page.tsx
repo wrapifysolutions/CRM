@@ -51,9 +51,13 @@ export default async function GroupDetailPage({
   }
 
   const canEditMembers = hasPermission(profile.role, "projects.update");
-  const canCreateTask = hasPermission(profile.role, "tasks.create");
+  const canCreateTask =
+    profile.role !== "super_admin" &&
+    hasPermission(profile.role, "tasks.create");
   const memberLabel =
-    profile.role === "manager" ? "Employees" : "Managers";
+    profile.role === "manager"
+      ? "Employees & Super Admins"
+      : "Managers";
 
   const [messages, tasks, users] = await Promise.all([
     getGroupMessages(id),
@@ -63,6 +67,7 @@ export default async function GroupDetailPage({
       : Promise.resolve([]),
   ]);
 
+  // Managers assign tasks to employees only (not Super Admins)
   const memberOptions =
     profile.role === "manager"
       ? users.filter((u) => u.role === "employee")
@@ -70,7 +75,6 @@ export default async function GroupDetailPage({
         ? group.members_users
         : users.filter((u) => group.member_user_ids.includes(u.id));
 
-  // Picker list: only role-allowed people (employees for manager, managers for SA)
   const allUsersForPicker = users;
   return (
     <div className="animate-fade-up space-y-5">
@@ -106,8 +110,17 @@ export default async function GroupDetailPage({
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[240px_minmax(0,1fr)_280px] lg:items-start">
-        <Card className="order-2 border-border/70 shadow-sm lg:order-1">
+      <div className="grid gap-4 xl:grid-cols-[220px_minmax(0,1fr)_260px] xl:items-start">
+        <div className="order-1 min-w-0 xl:order-2">
+          <GroupChatPanel
+            groupId={group.id}
+            messages={messages}
+            currentUserId={profile.id}
+            title={group.name}
+          />
+        </div>
+
+        <Card className="order-2 border-border/70 shadow-sm xl:order-1">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm">{memberLabel}</CardTitle>
           </CardHeader>
@@ -121,15 +134,6 @@ export default async function GroupDetailPage({
             />
           </CardContent>
         </Card>
-
-        <div className="order-1 lg:order-2">
-          <GroupChatPanel
-            groupId={group.id}
-            messages={messages}
-            currentUserId={profile.id}
-            title={group.name}
-          />
-        </div>
 
         <div className="order-3 space-y-4">
           {canCreateTask && (

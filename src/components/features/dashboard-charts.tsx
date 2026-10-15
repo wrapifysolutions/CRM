@@ -20,7 +20,7 @@ import {
   YAxis,
 } from "recharts";
 
-const COLORS = ["#24548c", "#3a6ea5", "#6b93c4", "#94a8c0", "#1a3d68", "#7c9bc2"];
+const COLORS = ["#0f766e", "#14b8a6", "#0d9488", "#5eead4", "#134e4a", "#99f6e4"];
 
 type Slice = { name: string; value: number; key?: string };
 
@@ -46,7 +46,7 @@ function ChartTooltip({
         <p key={p.name} className="flex items-center gap-2 text-muted">
           <span
             className="h-2 w-2 rounded-full"
-            style={{ background: p.color ?? "#24548c" }}
+            style={{ background: p.color ?? "#0f766e" }}
           />
           {p.name}:{" "}
           <span className="font-semibold text-foreground">
@@ -152,8 +152,8 @@ export function StatusBarChart({
             <BarChart data={data} barCategoryGap="22%">
               <defs>
                 <linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#3a6ea5" stopOpacity={1} />
-                  <stop offset="100%" stopColor="#24548c" stopOpacity={0.85} />
+                  <stop offset="0%" stopColor="#14b8a6" stopOpacity={1} />
+                  <stop offset="100%" stopColor="#0f766e" stopOpacity={0.85} />
                 </linearGradient>
               </defs>
               <CartesianGrid
@@ -214,8 +214,8 @@ export function PipelineAreaChart({
             <AreaChart data={data}>
               <defs>
                 <linearGradient id="pipelineFill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#24548c" stopOpacity={0.5} />
-                  <stop offset="100%" stopColor="#24548c" stopOpacity={0.02} />
+                  <stop offset="0%" stopColor="#0f766e" stopOpacity={0.5} />
+                  <stop offset="100%" stopColor="#0f766e" stopOpacity={0.02} />
                 </linearGradient>
               </defs>
               <CartesianGrid
@@ -240,11 +240,11 @@ export function PipelineAreaChart({
                 type="monotone"
                 dataKey="value"
                 name="Tasks"
-                stroke="#24548c"
+                stroke="#0f766e"
                 strokeWidth={3}
                 fill="url(#pipelineFill)"
                 isAnimationActive={false}
-                activeDot={{ r: 5, fill: "#3a6ea5" }}
+                activeDot={{ r: 5, fill: "#14b8a6" }}
               />
             </AreaChart>
           </ResponsiveContainer>
@@ -296,9 +296,9 @@ export function MonthlyTrendChart({
                 type="monotone"
                 dataKey="clients"
                 name="Clients"
-                stroke="#24548c"
+                stroke="#0f766e"
                 strokeWidth={3}
-                dot={{ r: 4, fill: "#24548c" }}
+                dot={{ r: 4, fill: "#0f766e" }}
                 activeDot={{ r: 6 }}
                 isAnimationActive={false}
               />
@@ -417,7 +417,7 @@ export function ProgressLeadersChart({
               <Bar
                 dataKey="value"
                 name="Progress %"
-                fill="#3a6ea5"
+                fill="#14b8a6"
                 radius={[0, 8, 8, 0]}
                 isAnimationActive={false}
               />
@@ -442,7 +442,7 @@ export function CompletionGauge({
     {
       name: title,
       value: Math.min(100, Math.max(0, value)),
-      fill: "#24548c",
+      fill: "#0f766e",
     },
   ];
 
@@ -525,7 +525,7 @@ export function TeamPerformanceChart({
                 dataKey="done"
                 name="Done"
                 stackId="a"
-                fill="#24548c"
+                fill="#0f766e"
                 radius={[0, 0, 0, 0]}
                 isAnimationActive={false}
               />
